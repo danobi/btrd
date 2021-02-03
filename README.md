@@ -1,2 +1,2 @@
 # btrd
-btrfs debugger
+btrfs debugger (pronounced "buttered")
