@@ -50,7 +50,7 @@ fn save_history(editor: &mut Editor<()>) -> Result<()> {
 
 fn welcome() {
     println!(
-        r#"btrd ("buttered"), the btrfs debugger, version {}"#,
+        r#"btrd (the btrfs debugger) v{}"#,
         env!("CARGO_PKG_VERSION")
     );
     println!("Type 'help' for help");
