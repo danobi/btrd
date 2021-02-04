@@ -1,12 +1,15 @@
 use anyhow::{bail, Result};
 use log::{error, info};
 use rustyline::error::ReadlineError;
-use rustyline::{config::Config as EditorConfig, Editor};
+use rustyline::{config::Config as EditorConfig, Editor, Helper};
 use simplelog::{Config as LogConfig, LevelFilter, SimpleLogger};
 use structopt::StructOpt;
 
 mod eval;
+mod repl;
+
 use eval::{eval, EvalResult};
+use repl::ReplHelper;
 
 const HISTORY_FILE: &str = ".btrd_history";
 const PROMPT: &str = "(btrd) ";
@@ -31,17 +34,20 @@ fn init_logging(debug: bool) -> Result<()> {
     }
 }
 
-fn init_editor() -> Editor<()> {
+fn init_editor() -> Editor<ReplHelper> {
     let config = EditorConfig::builder().auto_add_history(true).build();
+    let mut editor = Editor::with_config(config);
+    let validator = ReplHelper::new();
+    editor.set_helper(Some(validator));
 
-    Editor::<()>::with_config(config)
+    editor
 }
 
-fn init_history(editor: &mut Editor<()>) {
+fn init_history<H: Helper>(editor: &mut Editor<H>) {
     let _ = editor.load_history(HISTORY_FILE);
 }
 
-fn save_history(editor: &mut Editor<()>) -> Result<()> {
+fn save_history<H: Helper>(editor: &mut Editor<H>) -> Result<()> {
     match editor.save_history(HISTORY_FILE) {
         Ok(_) => Ok(()),
         Err(e) => bail!("Failed to save history: {}", e),
