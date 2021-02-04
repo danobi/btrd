@@ -5,3 +5,8 @@ authors = ["Daniel Xu <dxu@dxuuu.xyz>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
+log = "0.4"
+rustyline = "7.1"
+simplelog = "0.9"
+structopt = "0.3"
