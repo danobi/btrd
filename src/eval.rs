@@ -1,5 +1,8 @@
 use std::fmt;
 
+use crate::ast::{BuiltinStatement, Statement};
+use crate::parse::parse;
+
 fn print_help() {
     println!("help\t\tPrint help");
     println!("quit\t\tExit debugger");
@@ -21,13 +24,29 @@ impl fmt::Display for EvalResult {
     }
 }
 
-pub fn eval(cmd: &str) -> EvalResult {
-    match cmd {
-        "help" => {
+fn eval_statement(stmt: &Statement) -> EvalResult {
+    match stmt {
+        Statement::BuiltinStatement(BuiltinStatement::Help) => {
             print_help();
             EvalResult::Ok
         }
-        "quit" => EvalResult::Quit,
+        Statement::BuiltinStatement(BuiltinStatement::Quit) => EvalResult::Quit,
         _ => EvalResult::Err("Invalid command".to_string()),
     }
+}
+
+pub fn eval(cmd: &str) -> EvalResult {
+    let stmts = match parse(cmd) {
+        Ok(s) => s,
+        Err(e) => return EvalResult::Err(e.to_string()),
+    };
+
+    for stmt in stmts {
+        match eval_statement(&stmt) {
+            EvalResult::Ok => (),
+            res @ _ => return res,
+        }
+    }
+
+    EvalResult::Ok
 }
