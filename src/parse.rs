@@ -1,3 +1,32 @@
+//! This module implements btrd's domain specific language.
+//!
+//! The DSL is defined as a PEG (https://en.wikipedia.org/wiki/Parsing_expression_grammar)
+//! and by definition unambiguous. If you're not familiar with PEGs, you can think of it
+//! as a formalization for the very pragmatic recursive descent parser.
+//!
+//! Developer notes:
+//!
+//! * A PEG is order sensitive. If you're having trouble getting your rules to parse, check
+//!   that keywords/tokens are parsed before identifiers. For example, ensure that `<=` is parsed
+//!   before `<`, otherwise the parser will take `<` and be consfused when it sees the `=`.
+//!   Likewise, ensure that tokens like `help` are parsed by a rule before the identifier rule is
+//!   kicked in.
+//!
+//! * PEGs may not have left recursion (left recursion manifests as an infinite loop that
+//!   eventually blows the stack). For example, this rule is not valid:
+//!
+//!     expr <- expr '*' expr
+//!
+//!   because PEGs are greedy and always try to take the first match.
+//!
+//! * To implement operator precedence, this parser uses a "precedence ladder" (a term I'm making
+//!   up and not to be confused with a "precedence climber"). Lower precedence operations are
+//!   "higher up" on the parser so they bind later than the higher precedence operators. For
+//!   example, because `||` is lower precedence than `&&`, the `||` production rule is before
+//!   the `&&` production rule. That way, if `&&` is in the lhs or rhs of `||`, the `&&` has a
+//!   chance to bind to further operands before `||`.
+//!
+
 use std::char::decode_utf16;
 use std::char::REPLACEMENT_CHARACTER;
 use std::collections::VecDeque;
