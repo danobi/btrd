@@ -76,9 +76,12 @@ fn main() -> Result<()> {
     loop {
         match editor.readline(PROMPT) {
             Ok(line) => {
-                info!("read: {}", &line);
+                let fixed = repl::fixup_input(&line);
 
-                match eval(&line) {
+                info!("read: {}", line.escape_debug());
+                info!("cleaned: {}", fixed.escape_debug());
+
+                match eval(&fixed) {
                     EvalResult::Ok => (),
                     EvalResult::Quit => break,
                     EvalResult::Err(e) => {
