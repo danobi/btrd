@@ -112,12 +112,12 @@ fn string<'a>() -> Parser<'a, char, Expression> {
 }
 
 fn constant<'a>() -> Parser<'a, char, Expression> {
-    let integer = one_of("123456789") - one_of("0123456789").repeat(0..) | sym('0');
+    let integer = (one_of("123456789") - one_of("0123456789").repeat(0..)) | sym('0');
     let number = (sym('-').opt() + integer)
         .collect()
         .map(String::from_iter)
         .convert(|s| i64::from_str(&s));
-    let constant = number.map(|v| Constant::Integer(v))
+    let constant = number.map(Constant::Integer)
         | tag("true").map(|_| Constant::Boolean(true))
         | tag("false").map(|_| Constant::Boolean(false));
 
@@ -129,7 +129,7 @@ fn ident<'a>() -> Parser<'a, char, Expression> {
         + is_a(|c: char| c.is_ascii_alphanumeric()).repeat(0..))
     .collect()
     .map(String::from_iter)
-    .map(|s| Identifier(s))
+    .map(Identifier)
     .map(|i| Expression::PrimaryExpression(PrimaryExpression::Identifier(i)))
 }
 
@@ -148,11 +148,9 @@ fn postfix_expr<'a>() -> Parser<'a, char, Expression> {
     }
 
     let arg_list = list(call(expr), space() * sym(','));
-    let function_call =
-        (sym('(') * arg_list - space() - sym(')')).map(|args| PostfixOp::FunctionCall(args));
-    let array_index =
-        (sym('[') * call(expr) - space() - sym(']')).map(|index| PostfixOp::ArrayIndex(index));
-    let field_access = (sym('.') * ident()).map(|ident| PostfixOp::FieldAccess(ident));
+    let function_call = (sym('(') * arg_list - space() - sym(')')).map(PostfixOp::FunctionCall);
+    let array_index = (sym('[') * call(expr) - space() - sym(']')).map(PostfixOp::ArrayIndex);
+    let field_access = (sym('.') * ident()).map(PostfixOp::FieldAccess);
     let parser =
         call(primary_expr) + (space() * (function_call | array_index | field_access)).repeat(0..);
 
@@ -332,7 +330,7 @@ fn if_else_stmt<'a>() -> Parser<'a, char, Statement> {
         Statement::BlockStatement(BlockStatement::If(
             cond,
             true_body,
-            false_body.unwrap_or_else(|| Vec::new()),
+            false_body.unwrap_or_else(Vec::new),
         ))
     })
 }
@@ -370,7 +368,7 @@ fn builtin_stmt<'a>() -> Parser<'a, char, Statement> {
 }
 
 fn expr_stmt<'a>() -> Parser<'a, char, Statement> {
-    expr().map(|e| Statement::ExpressionStatement(e))
+    expr().map(Statement::ExpressionStatement)
 }
 
 /// Parse a statment

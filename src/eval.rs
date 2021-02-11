@@ -44,7 +44,7 @@ pub fn eval(cmd: &str) -> EvalResult {
     for stmt in stmts {
         match eval_statement(&stmt) {
             EvalResult::Ok => (),
-            res @ _ => return res,
+            res => return res,
         }
     }
 
