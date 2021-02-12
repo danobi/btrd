@@ -9,6 +9,8 @@ mod ast;
 mod eval;
 mod parse;
 mod repl;
+mod semantics;
+mod types;
 
 use eval::{eval, EvalResult};
 use repl::ReplHelper;
@@ -85,7 +87,7 @@ fn main() -> Result<()> {
                     EvalResult::Ok => (),
                     EvalResult::Quit => break,
                     EvalResult::Err(e) => {
-                        eprintln!("{}", e);
+                        eprintln!("Error: {}", e);
                         continue;
                     }
                 }

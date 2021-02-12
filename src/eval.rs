@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::ast::{BuiltinStatement, Statement};
 use crate::parse::parse;
+use crate::semantics::analyze;
 
 fn print_help() {
     println!("help\t\tPrint help");
@@ -36,11 +37,19 @@ fn eval_statement(stmt: &Statement) -> EvalResult {
 }
 
 pub fn eval(cmd: &str) -> EvalResult {
+    // Parse input into AST
     let stmts = match parse(cmd) {
         Ok(s) => s,
         Err(e) => return EvalResult::Err(e.to_string()),
     };
 
+    // Perform semantic analysis
+    match analyze(&stmts) {
+        Ok(_) => (),
+        Err(e) => return EvalResult::Err(e.to_string()),
+    };
+
+    // Evaluate AST
     for stmt in stmts {
         match eval_statement(&stmt) {
             EvalResult::Ok => (),

@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, PartialEq)]
 pub enum UnaryExpression {
     /// `~`
@@ -38,14 +40,39 @@ pub enum BinaryExpression {
     LeftShift(Box<Expression>, Box<Expression>),
     /// `>>`
     RightShift(Box<Expression>, Box<Expression>),
-    // `<`
+    /// `<`
     LessThan(Box<Expression>, Box<Expression>),
-    // `<=`
+    /// `<=`
     LessThanEquals(Box<Expression>, Box<Expression>),
-    // `>`
+    /// `>`
     GreaterThan(Box<Expression>, Box<Expression>),
-    // `>=`
+    /// `>=`
     GreaterThanEquals(Box<Expression>, Box<Expression>),
+}
+
+impl BinaryExpression {
+    pub fn op_str(&self) -> &str {
+        match self {
+            BinaryExpression::Plus(_, _) => "+",
+            BinaryExpression::Minus(_, _) => "-",
+            BinaryExpression::Multiply(_, _) => "*",
+            BinaryExpression::Divide(_, _) => "/",
+            BinaryExpression::Modulo(_, _) => "%",
+            BinaryExpression::Equals(_, _) => "==",
+            BinaryExpression::NotEquals(_, _) => "!=",
+            BinaryExpression::LogicalAnd(_, _) => "&&",
+            BinaryExpression::LogicalOr(_, _) => "||",
+            BinaryExpression::BitOr(_, _) => "|",
+            BinaryExpression::BitAnd(_, _) => "&",
+            BinaryExpression::BitXor(_, _) => "^",
+            BinaryExpression::LeftShift(_, _) => "<<",
+            BinaryExpression::RightShift(_, _) => ">>",
+            BinaryExpression::LessThan(_, _) => "<",
+            BinaryExpression::LessThanEquals(_, _) => "<=",
+            BinaryExpression::GreaterThan(_, _) => ">",
+            BinaryExpression::GreaterThanEquals(_, _) => ">=",
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -54,8 +81,14 @@ pub enum Constant {
     Boolean(bool),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Hash, PartialOrd, Ord, Eq, Clone)]
 pub struct Identifier(pub String);
+
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum PrimaryExpression {
@@ -92,6 +125,17 @@ pub enum BlockStatement {
 pub enum JumpStatement {
     Break,
     Continue,
+}
+
+impl fmt::Display for JumpStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            JumpStatement::Break => "break",
+            JumpStatement::Continue => "continue",
+        };
+
+        write!(f, "{}", name)
+    }
 }
 
 #[derive(Debug, PartialEq)]

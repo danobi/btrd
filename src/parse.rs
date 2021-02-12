@@ -126,7 +126,7 @@ fn constant<'a>() -> Parser<'a, char, Expression> {
 
 fn ident<'a>() -> Parser<'a, char, Expression> {
     (is_a(|c: char| c.is_ascii_alphabetic() || c == '_')
-        + is_a(|c: char| c.is_ascii_alphanumeric()).repeat(0..))
+        + is_a(|c: char| c.is_ascii_alphanumeric() || c == '_').repeat(0..))
     .collect()
     .map(String::from_iter)
     .map(Identifier)
@@ -391,7 +391,7 @@ fn stmts<'a>() -> Parser<'a, char, Vec<Statement>> {
 
 pub fn parse(input: &str) -> pom::Result<Vec<Statement>> {
     let input: Vec<char> = input.chars().collect();
-    let program = stmts() - end();
+    let program = stmts() - space() - end();
     let stmts = program.parse(&input)?;
 
     Ok(stmts)
