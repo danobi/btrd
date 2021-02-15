@@ -9,6 +9,17 @@ fn print_help() {
     println!("quit\t\tExit debugger");
 }
 
+fn eval_statement(stmt: &Statement) -> EvalResult {
+    match stmt {
+        Statement::BuiltinStatement(BuiltinStatement::Help) => {
+            print_help();
+            EvalResult::Ok
+        }
+        Statement::BuiltinStatement(BuiltinStatement::Quit) => EvalResult::Quit,
+        _ => EvalResult::Err("Invalid command".to_string()),
+    }
+}
+
 pub enum EvalResult {
     Ok,
     Quit,
@@ -22,17 +33,6 @@ impl fmt::Display for EvalResult {
             EvalResult::Quit => write!(f, "Quit"),
             EvalResult::Err(msg) => write!(f, "{}", msg),
         }
-    }
-}
-
-fn eval_statement(stmt: &Statement) -> EvalResult {
-    match stmt {
-        Statement::BuiltinStatement(BuiltinStatement::Help) => {
-            print_help();
-            EvalResult::Ok
-        }
-        Statement::BuiltinStatement(BuiltinStatement::Quit) => EvalResult::Quit,
-        _ => EvalResult::Err("Invalid command".to_string()),
     }
 }
 
