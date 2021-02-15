@@ -12,7 +12,7 @@ mod repl;
 mod semantics;
 mod variables;
 
-use eval::{eval, EvalResult};
+use eval::{Eval, EvalResult};
 use repl::ReplHelper;
 
 const HISTORY_FILE: &str = ".btrd_history";
@@ -75,6 +75,8 @@ fn main() -> Result<()> {
     init_history(&mut editor);
     welcome();
 
+    let mut eval = Eval::new();
+
     loop {
         match editor.readline(PROMPT) {
             Ok(line) => {
@@ -83,7 +85,7 @@ fn main() -> Result<()> {
                 info!("read: {}", line.escape_debug());
                 info!("cleaned: {}", fixed.escape_debug());
 
-                match eval(&fixed) {
+                match eval.eval(&fixed) {
                     EvalResult::Ok => (),
                     EvalResult::Quit => break,
                     EvalResult::Err(e) => {

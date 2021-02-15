@@ -36,26 +36,34 @@ impl fmt::Display for EvalResult {
     }
 }
 
-pub fn eval(cmd: &str) -> EvalResult {
-    // Parse input into AST
-    let stmts = match parse(cmd) {
-        Ok(s) => s,
-        Err(e) => return EvalResult::Err(e.to_string()),
-    };
+pub struct Eval {}
 
-    // Perform semantic analysis
-    match analyze(&stmts) {
-        Ok(_) => (),
-        Err(e) => return EvalResult::Err(e.to_string()),
-    };
-
-    // Evaluate AST
-    for stmt in stmts {
-        match eval_statement(&stmt) {
-            EvalResult::Ok => (),
-            res => return res,
-        }
+impl Eval {
+    pub fn new() -> Self {
+        Self {}
     }
 
-    EvalResult::Ok
+    pub fn eval(&mut self, cmd: &str) -> EvalResult {
+        // Parse input into AST
+        let stmts = match parse(cmd) {
+            Ok(s) => s,
+            Err(e) => return EvalResult::Err(e.to_string()),
+        };
+
+        // Perform semantic analysis
+        match analyze(&stmts) {
+            Ok(_) => (),
+            Err(e) => return EvalResult::Err(e.to_string()),
+        };
+
+        // Evaluate AST
+        for stmt in stmts {
+            match eval_statement(&stmt) {
+                EvalResult::Ok => (),
+                res => return res,
+            }
+        }
+
+        EvalResult::Ok
+    }
 }
