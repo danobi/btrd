@@ -62,13 +62,13 @@ impl fmt::Display for Type {
     }
 }
 
-struct SemanticAnalyzer {
+pub struct SemanticAnalyzer {
     variables: Variables<Type>,
     loop_depth: u32,
 }
 
 impl SemanticAnalyzer {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             variables: Variables::new(),
             loop_depth: 0,
@@ -104,8 +104,21 @@ impl SemanticAnalyzer {
             | BinaryExpression::BitAnd(lhs, rhs)
             | BinaryExpression::BitXor(lhs, rhs)
             | BinaryExpression::LeftShift(lhs, rhs)
-            | BinaryExpression::RightShift(lhs, rhs)
-            | BinaryExpression::LessThan(lhs, rhs)
+            | BinaryExpression::RightShift(lhs, rhs) => {
+                let lhs_ty = self.eval_type(lhs)?;
+                let rhs_ty = self.eval_type(rhs)?;
+
+                match (&lhs_ty, &rhs_ty) {
+                    (Type::Integer(_), Type::Integer(_)) => Type::Integer(IntegerType {}),
+                    (_, _) => bail!(
+                        "Cannot perform '{}' on '{}' and '{}'",
+                        binop.op_str(),
+                        lhs_ty,
+                        rhs_ty
+                    ),
+                }
+            }
+            BinaryExpression::LessThan(lhs, rhs)
             | BinaryExpression::LessThanEquals(lhs, rhs)
             | BinaryExpression::GreaterThan(lhs, rhs)
             | BinaryExpression::GreaterThanEquals(lhs, rhs) => {
@@ -113,7 +126,7 @@ impl SemanticAnalyzer {
                 let rhs_ty = self.eval_type(rhs)?;
 
                 match (&lhs_ty, &rhs_ty) {
-                    (Type::Integer(_), Type::Integer(_)) => Type::Integer(IntegerType {}),
+                    (Type::Integer(_), Type::Integer(_)) => Type::Boolean(BooleanType {}),
                     (_, _) => bail!(
                         "Cannot perform '{}' on '{}' and '{}'",
                         binop.op_str(),
@@ -297,7 +310,7 @@ impl SemanticAnalyzer {
                     if let Some(lhs_type) = self.variables.get(ident) {
                         ensure!(
                             lhs_type == &rhs_type,
-                            "Cannot assign type {} to {} (which is type {})",
+                            "Cannot assign type '{}' to '{}' (which is type '{}')",
                             rhs_type,
                             ident,
                             lhs_type
@@ -340,7 +353,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze(&mut self, stmts: &[Statement]) -> Result<()> {
+    pub fn analyze(&mut self, stmts: &[Statement]) -> Result<()> {
         for stmt in stmts {
             self.analyze_stmt(stmt)?;
         }
@@ -349,7 +362,8 @@ impl SemanticAnalyzer {
     }
 }
 
-pub fn analyze(stmts: &[Statement]) -> Result<()> {
+#[cfg(test)]
+fn analyze(stmts: &[Statement]) -> Result<()> {
     SemanticAnalyzer::new().analyze(stmts)
 }
 
@@ -648,6 +662,7 @@ fn test_binops() {
             3 > 4;
             3 >= 4;
             3 <= 4;
+            (5 < 3) || false;
         "#;
         let stmts = parse(prog);
         assert!(analyze(&stmts).is_ok());

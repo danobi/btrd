@@ -75,7 +75,8 @@ fn main() -> Result<()> {
     init_history(&mut editor);
     welcome();
 
-    let mut eval = Eval::new();
+    let mut stdout = std::io::stdout();
+    let mut eval = Eval::new(&mut stdout, true);
 
     loop {
         match editor.readline(PROMPT) {
