@@ -9,17 +9,6 @@ fn print_help() {
     println!("quit\t\tExit debugger");
 }
 
-fn eval_statement(stmt: &Statement) -> EvalResult {
-    match stmt {
-        Statement::BuiltinStatement(BuiltinStatement::Help) => {
-            print_help();
-            EvalResult::Ok
-        }
-        Statement::BuiltinStatement(BuiltinStatement::Quit) => EvalResult::Quit,
-        _ => EvalResult::Err("Invalid command".to_string()),
-    }
-}
-
 pub enum EvalResult {
     Ok,
     Quit,
@@ -39,6 +28,28 @@ impl fmt::Display for EvalResult {
 pub struct Eval {}
 
 impl Eval {
+    fn eval_builtin(&mut self, builtin: &BuiltinStatement) -> EvalResult {
+        match builtin {
+            BuiltinStatement::Help => {
+                print_help();
+                EvalResult::Ok
+            }
+            BuiltinStatement::Quit => EvalResult::Quit,
+            BuiltinStatement::Filesystem(_fs) => unimplemented!(),
+            BuiltinStatement::Print(_expr) => unimplemented!(),
+        }
+    }
+
+    fn eval_statement(&mut self, stmt: &Statement) -> EvalResult {
+        match stmt {
+            Statement::AssignStatement(_lhs, _rhs) => unimplemented!(),
+            Statement::BlockStatement(_block) => unimplemented!(),
+            Statement::JumpStatement(_jump) => unimplemented!(),
+            Statement::BuiltinStatement(builtin) => self.eval_builtin(builtin),
+            Statement::ExpressionStatement(_expr) => unimplemented!(),
+        }
+    }
+
     pub fn new() -> Self {
         Self {}
     }
@@ -58,7 +69,7 @@ impl Eval {
 
         // Evaluate AST
         for stmt in stmts {
-            match eval_statement(&stmt) {
+            match self.eval_statement(&stmt) {
                 EvalResult::Ok => (),
                 res => return res,
             }
