@@ -11,51 +11,59 @@
 //! makes sense when operating on btrfs data structures. btrd does not let the user define custom
 //! structs or arrays.
 
-use std::collections::BTreeMap;
+use std::fmt;
 
 use anyhow::{anyhow, bail, ensure, Result};
 
 use crate::ast::*;
-use crate::types::{BooleanType, IntegerType, StringType, Type};
+use crate::variables::Variables;
 
-struct Variables {
-    inner: Vec<BTreeMap<Identifier, Type>>,
+#[derive(PartialEq, Clone)]
+pub struct IntegerType {}
+
+impl fmt::Display for IntegerType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "integer")
+    }
 }
 
-impl Variables {
-    fn new() -> Self {
-        Variables {
-            inner: vec![BTreeMap::default()],
+#[derive(PartialEq, Clone)]
+pub struct StringType {}
+
+impl fmt::Display for StringType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "string")
+    }
+}
+
+#[derive(PartialEq, Clone)]
+pub struct BooleanType {}
+
+impl fmt::Display for BooleanType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "boolean")
+    }
+}
+
+#[derive(PartialEq, Clone)]
+pub enum Type {
+    Integer(IntegerType),
+    String(StringType),
+    Boolean(BooleanType),
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Type::Integer(t) => write!(f, "{}", t),
+            Type::String(t) => write!(f, "{}", t),
+            Type::Boolean(t) => write!(f, "{}", t),
         }
-    }
-
-    fn push_scope(&mut self) {
-        self.inner.push(BTreeMap::default());
-    }
-
-    fn pop_scope(&mut self) {
-        assert!(self.inner.len() > 0);
-        self.inner.pop();
-    }
-
-    fn get(&self, ident: &Identifier) -> Option<&Type> {
-        for scope in self.inner.iter().rev() {
-            if let Some(ty) = scope.get(ident) {
-                return Some(ty);
-            }
-        }
-
-        None
-    }
-
-    fn insert(&mut self, ident: Identifier, ty: Type) {
-        assert!(self.inner.len() > 0);
-        self.inner.last_mut().unwrap().insert(ident, ty);
     }
 }
 
 struct SemanticAnalyzer {
-    variables: Variables,
+    variables: Variables<Type>,
     loop_depth: u32,
 }
 

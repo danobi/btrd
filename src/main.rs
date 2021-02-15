@@ -10,7 +10,7 @@ mod eval;
 mod parse;
 mod repl;
 mod semantics;
-mod types;
+mod variables;
 
 use eval::{eval, EvalResult};
 use repl::ReplHelper;
