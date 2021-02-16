@@ -1,4 +1,4 @@
-![](../dot/architecture.png){ width=100% }
+![](./dot/architecture.png)
 
 ### Directories
 
