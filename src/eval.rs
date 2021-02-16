@@ -53,12 +53,29 @@ pub enum EvalResult {
     Err(String),
 }
 
-impl fmt::Display for EvalResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+/// Internal version of `EvalResult`
+///
+/// We don't want to expose internal details (like control flow) to anyone outside this module
+enum InternalEvalResult {
+    Ok,
+    Quit,
+    Err(String),
+    Break,
+    Continue,
+}
+
+impl InternalEvalResult {
+    fn to_eval_result(self) -> EvalResult {
         match self {
-            EvalResult::Ok => Ok(()),
-            EvalResult::Quit => write!(f, "Quit"),
-            EvalResult::Err(msg) => write!(f, "{}", msg),
+            InternalEvalResult::Ok => EvalResult::Ok,
+            InternalEvalResult::Quit => EvalResult::Quit,
+            InternalEvalResult::Err(s) => EvalResult::Err(s),
+            InternalEvalResult::Break => {
+                EvalResult::Err("Unhandled control flow eval result (tell Daniel)".to_string())
+            }
+            InternalEvalResult::Continue => {
+                EvalResult::Err("Unhandled control flow eval result (tell Daniel)".to_string())
+            }
         }
     }
 }
@@ -279,33 +296,33 @@ impl<'a> Eval<'a> {
         }
     }
 
-    fn eval_builtin(&mut self, builtin: &BuiltinStatement) -> EvalResult {
+    fn eval_builtin(&mut self, builtin: &BuiltinStatement) -> InternalEvalResult {
         match builtin {
             BuiltinStatement::Help => self.print_help(),
-            BuiltinStatement::Quit => EvalResult::Quit,
+            BuiltinStatement::Quit => InternalEvalResult::Quit,
             BuiltinStatement::Filesystem(_fs) => unimplemented!(),
             BuiltinStatement::Print(expr) => match self.eval_expr(expr) {
                 Ok(v) => match writeln!(self.sink, "{}", v) {
-                    Ok(_) => EvalResult::Ok,
-                    Err(e) => EvalResult::Err(e.to_string()),
+                    Ok(_) => InternalEvalResult::Ok,
+                    Err(e) => InternalEvalResult::Err(e.to_string()),
                 },
-                Err(e) => return EvalResult::Err(e.to_string()),
+                Err(e) => return InternalEvalResult::Err(e.to_string()),
             },
         }
     }
 
-    fn eval_statement(&mut self, stmt: &Statement) -> EvalResult {
+    fn eval_statement(&mut self, stmt: &Statement) -> InternalEvalResult {
         match stmt {
             Statement::AssignStatement(lhs, rhs) => {
                 if let Expression::PrimaryExpression(PrimaryExpression::Identifier(ident)) = lhs {
                     match self.eval_expr(rhs) {
                         Ok(v) => self.variables.insert(ident.clone(), v),
-                        Err(e) => return EvalResult::Err(e.to_string()),
+                        Err(e) => return InternalEvalResult::Err(e.to_string()),
                     };
 
-                    EvalResult::Ok
+                    InternalEvalResult::Ok
                 } else {
-                    EvalResult::Err(
+                    InternalEvalResult::Err(
                         "Semantic analysis failure: lhs of assignment isn't an ident (tell Daniel)"
                             .to_string(),
                     )
@@ -316,29 +333,33 @@ impl<'a> Eval<'a> {
                     let cond = match self.eval_expr(cond) {
                         Ok(c) => match c.to_boolean() {
                             Ok(v) => v,
-                            Err(e) => return EvalResult::Err(e.to_string()),
+                            Err(e) => return InternalEvalResult::Err(e.to_string()),
                         },
-                        Err(e) => return EvalResult::Err(e.to_string()),
+                        Err(e) => return InternalEvalResult::Err(e.to_string()),
                     };
 
                     let stmts = if cond { true_body } else { false_body };
                     for stmt in stmts {
                         match self.eval_statement(stmt) {
-                            EvalResult::Ok => (),
-                            r @ EvalResult::Err(_) | r @ EvalResult::Quit => return r,
+                            InternalEvalResult::Ok => (),
+                            r @ InternalEvalResult::Err(_)
+                            | r @ InternalEvalResult::Quit
+                            | r @ InternalEvalResult::Break
+                            | r @ InternalEvalResult::Continue => return r,
                         };
                     }
 
-                    EvalResult::Ok
+                    InternalEvalResult::Ok
                 }
                 BlockStatement::While(cond, stmts) => {
+                    let mut break_loop = false;
                     loop {
                         let cond = match self.eval_expr(cond) {
                             Ok(c) => match c.to_boolean() {
                                 Ok(v) => v,
-                                Err(e) => return EvalResult::Err(e.to_string()),
+                                Err(e) => return InternalEvalResult::Err(e.to_string()),
                             },
-                            Err(e) => return EvalResult::Err(e.to_string()),
+                            Err(e) => return InternalEvalResult::Err(e.to_string()),
                         };
 
                         if !cond {
@@ -346,56 +367,62 @@ impl<'a> Eval<'a> {
                         }
 
                         for stmt in stmts {
-                            match stmt {
-                                Statement::JumpStatement(JumpStatement::Break) => break,
-                                Statement::JumpStatement(JumpStatement::Continue) => continue,
-                                _ => (),
-                            };
-
                             match self.eval_statement(stmt) {
-                                EvalResult::Ok => (),
-                                r @ EvalResult::Err(_) | r @ EvalResult::Quit => return r,
+                                InternalEvalResult::Ok => (),
+                                InternalEvalResult::Break => {
+                                    break_loop = true;
+                                    break;
+                                }
+                                InternalEvalResult::Continue => break,
+                                r @ InternalEvalResult::Err(_) | r @ InternalEvalResult::Quit => {
+                                    return r
+                                }
                             };
+                        }
+
+                        if break_loop {
+                            break;
                         }
                     }
 
-                    EvalResult::Ok
+                    InternalEvalResult::Ok
                 }
                 BlockStatement::For(_ident, _range, _stmts) => {
                     unimplemented!();
                 }
             },
-            Statement::JumpStatement(_) => {
-                panic!("Jump statement not handled in loop implementation")
-            }
+            Statement::JumpStatement(jump) => match jump {
+                JumpStatement::Break => InternalEvalResult::Break,
+                JumpStatement::Continue => InternalEvalResult::Continue,
+            },
             Statement::BuiltinStatement(builtin) => self.eval_builtin(builtin),
             Statement::ExpressionStatement(expr) => {
                 let val = match self.eval_expr(expr) {
                     Ok(v) => v,
-                    Err(e) => return EvalResult::Err(e.to_string()),
+                    Err(e) => return InternalEvalResult::Err(e.to_string()),
                 };
 
                 if self.interactive {
                     match writeln!(self.sink, "{}", val) {
                         Ok(_) => (),
-                        Err(e) => return EvalResult::Err(e.to_string()),
+                        Err(e) => return InternalEvalResult::Err(e.to_string()),
                     };
                 }
 
-                EvalResult::Ok
+                InternalEvalResult::Ok
             }
         }
     }
 
-    fn print_help(&mut self) -> EvalResult {
+    fn print_help(&mut self) -> InternalEvalResult {
         let mut s = String::new();
 
         s += "help\t\tPrint help\n";
         s += "quit\t\tExit debugger\n";
 
         match write!(self.sink, "{}", s) {
-            Ok(_) => EvalResult::Ok,
-            Err(e) => EvalResult::Err(e.to_string()),
+            Ok(_) => InternalEvalResult::Ok,
+            Err(e) => InternalEvalResult::Err(e.to_string()),
         }
     }
 
@@ -430,8 +457,8 @@ impl<'a> Eval<'a> {
         // Evaluate AST
         for stmt in stmts {
             match self.eval_statement(&stmt) {
-                EvalResult::Ok => (),
-                res => return res,
+                InternalEvalResult::Ok => (),
+                res => return res.to_eval_result(),
             }
         }
 
@@ -469,6 +496,55 @@ fn test_expression() {
         ("print 3 > 3;", "false\n"),
         ("print 3 >= 3;", "true\n"),
     ];
+
+    for (input, expected) in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
+        match eval.eval(input) {
+            EvalResult::Ok => (),
+            _ => assert!(false),
+        };
+        assert_eq!(
+            String::from_utf8(output).expect("Output not utf-8"),
+            expected
+        );
+    }
+}
+
+#[test]
+fn test_if() {
+    let tests = vec![
+        (r#"x = 3; if x == 3 { print "yep"; }"#, "\"yep\"\n"),
+        (
+            r#"x = 3; if x != 3 { print "yep"; } else { print "yep"; }"#,
+            "\"yep\"\n",
+        ),
+        (
+            r#"x = 3; if x != 3 { print "yep"; } else { print "yep"; if x == 3 { x = 4; } } print x;"#,
+            "\"yep\"\n4\n",
+        ),
+    ];
+
+    for (input, expected) in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
+        match eval.eval(input) {
+            EvalResult::Ok => (),
+            _ => assert!(false),
+        };
+        assert_eq!(
+            String::from_utf8(output).expect("Output not utf-8"),
+            expected
+        );
+    }
+}
+
+#[test]
+fn test_loop() {
+    let tests = vec![(
+        "x = 0; while x < 5 { if x == 3 { print x; break; } x = x + 1; }",
+        "3\n",
+    )];
 
     for (input, expected) in tests {
         let mut output = Vec::new();
