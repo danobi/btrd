@@ -18,7 +18,7 @@ impl<T> Variables<T> {
     }
 
     pub fn pop_scope(&mut self) {
-        assert!(self.inner.len() > 0);
+        assert!(!self.inner.is_empty());
         self.inner.pop();
     }
 
@@ -33,7 +33,7 @@ impl<T> Variables<T> {
     }
 
     pub fn insert(&mut self, ident: Identifier, val: T) {
-        assert!(self.inner.len() > 0);
+        assert!(!self.inner.is_empty());
         self.inner.last_mut().unwrap().insert(ident, val);
     }
 }

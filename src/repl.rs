@@ -32,7 +32,7 @@ impl Validator for ReplHelper {
 /// * Appends a `;` if not already present so the parser recognizes the input as a statement
 pub fn fixup_input(input: &str) -> String {
     let mut ret = input.replace("\\\n", " ");
-    if !ret.trim_end().ends_with(";") {
+    if !ret.trim_end().ends_with(';') {
         ret += ";";
     }
 

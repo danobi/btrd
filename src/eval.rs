@@ -20,14 +20,14 @@ enum Value {
 }
 
 impl Value {
-    fn to_integer(self) -> Result<i64> {
+    fn into_integer(self) -> Result<i64> {
         match self {
             Value::Integer(i) => Ok(i),
             _ => bail!("Value is not integer -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    fn to_boolean(self) -> Result<bool> {
+    fn into_boolean(self) -> Result<bool> {
         match self {
             Value::Boolean(b) => Ok(b),
             _ => bail!("Value is not boolean -- semantic analysis bug (tell Daniel)"),
@@ -65,7 +65,7 @@ enum InternalEvalResult {
 }
 
 impl InternalEvalResult {
-    fn to_eval_result(self) -> EvalResult {
+    fn into_eval_result(self) -> EvalResult {
         match self {
             InternalEvalResult::Ok => EvalResult::Ok,
             InternalEvalResult::Quit => EvalResult::Quit,
@@ -109,8 +109,8 @@ impl<'a> Eval<'a> {
     fn eval_binop_expr(&mut self, binop: &BinaryExpression) -> Result<Value> {
         match binop {
             BinaryExpression::Plus(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 let res = lhs_val
                     .checked_add(rhs_val)
@@ -119,8 +119,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::Minus(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 let res = lhs_val
                     .checked_sub(rhs_val)
@@ -129,8 +129,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::Multiply(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 let res = lhs_val
                     .checked_mul(rhs_val)
@@ -139,8 +139,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::Divide(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 if rhs_val == 0 {
                     bail!("Divide by zero");
@@ -153,8 +153,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::Modulo(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 if rhs_val == 0 {
                     bail!("Divide by zero");
@@ -167,26 +167,26 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::BitOr(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 Ok(Value::Integer(lhs_val | rhs_val))
             }
             BinaryExpression::BitAnd(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 Ok(Value::Integer(lhs_val & rhs_val))
             }
             BinaryExpression::BitXor(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 Ok(Value::Integer(lhs_val ^ rhs_val))
             }
             BinaryExpression::LeftShift(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 let res = lhs_val
                     .checked_shl(rhs_val.try_into()?)
@@ -195,8 +195,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::RightShift(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 let res = lhs_val
                     .checked_shr(rhs_val.try_into()?)
@@ -205,26 +205,26 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::LessThan(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 Ok(Value::Boolean(lhs_val < rhs_val))
             }
             BinaryExpression::LessThanEquals(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 Ok(Value::Boolean(lhs_val <= rhs_val))
             }
             BinaryExpression::GreaterThan(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 Ok(Value::Boolean(lhs_val > rhs_val))
             }
             BinaryExpression::GreaterThanEquals(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
 
                 Ok(Value::Boolean(lhs_val >= rhs_val))
             }
@@ -241,14 +241,14 @@ impl<'a> Eval<'a> {
                 Ok(Value::Boolean(lhs_val != rhs_val))
             }
             BinaryExpression::LogicalOr(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_boolean()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_boolean()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_boolean()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_boolean()?;
 
                 Ok(Value::Boolean(lhs_val || rhs_val))
             }
             BinaryExpression::LogicalAnd(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.to_boolean()?;
-                let rhs_val = self.eval_expr(&rhs)?.to_boolean()?;
+                let lhs_val = self.eval_expr(&lhs)?.into_boolean()?;
+                let rhs_val = self.eval_expr(&rhs)?.into_boolean()?;
 
                 Ok(Value::Boolean(lhs_val && rhs_val))
             }
@@ -258,7 +258,7 @@ impl<'a> Eval<'a> {
     fn eval_unary_expr(&mut self, unary: &UnaryExpression) -> Result<Value> {
         match unary {
             UnaryExpression::BitNot(expr) => {
-                let expr_val = self.eval_expr(expr)?.to_integer()?;
+                let expr_val = self.eval_expr(expr)?.into_integer()?;
                 Ok(Value::Integer(!expr_val))
             }
             UnaryExpression::Not(expr) => {
@@ -270,7 +270,7 @@ impl<'a> Eval<'a> {
                 }
             }
             UnaryExpression::Minus(expr) => {
-                let expr_val = self.eval_expr(expr)?.to_integer()?;
+                let expr_val = self.eval_expr(expr)?.into_integer()?;
                 Ok(Value::Integer(-expr_val))
             }
         }
@@ -306,7 +306,7 @@ impl<'a> Eval<'a> {
                     Ok(_) => InternalEvalResult::Ok,
                     Err(e) => InternalEvalResult::Err(e.to_string()),
                 },
-                Err(e) => return InternalEvalResult::Err(e.to_string()),
+                Err(e) => InternalEvalResult::Err(e.to_string()),
             },
         }
     }
@@ -331,7 +331,7 @@ impl<'a> Eval<'a> {
             Statement::BlockStatement(block) => match block {
                 BlockStatement::If(cond, true_body, false_body) => {
                     let cond = match self.eval_expr(cond) {
-                        Ok(c) => match c.to_boolean() {
+                        Ok(c) => match c.into_boolean() {
                             Ok(v) => v,
                             Err(e) => return InternalEvalResult::Err(e.to_string()),
                         },
@@ -355,7 +355,7 @@ impl<'a> Eval<'a> {
                     let mut break_loop = false;
                     loop {
                         let cond = match self.eval_expr(cond) {
-                            Ok(c) => match c.to_boolean() {
+                            Ok(c) => match c.into_boolean() {
                                 Ok(v) => v,
                                 Err(e) => return InternalEvalResult::Err(e.to_string()),
                             },
@@ -458,7 +458,7 @@ impl<'a> Eval<'a> {
         for stmt in stmts {
             match self.eval_statement(&stmt) {
                 InternalEvalResult::Ok => (),
-                res => return res.to_eval_result(),
+                res => return res.into_eval_result(),
             }
         }
 
