@@ -1,7 +1,7 @@
 digraph F {
     rankdir = BT;
 
-    subgraph cluster_2 {
+    subgraph cluster_0 {
         label = "btrfs";
         labeljust = "l";
         style = dotted;
@@ -18,7 +18,7 @@ digraph F {
         functions -> helpers;
     }
     
-    subgraph cluster_0 {
+    subgraph cluster_2 {
         label = "lang";
         labeljust = "l";
         style = dotted;
