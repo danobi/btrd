@@ -1,0 +1,32 @@
+digraph F {
+    rankdir = BT;
+
+    subgraph cluster_2 {
+        label = "btrfs";
+        labeljust = "l";
+        style = dotted;
+        definitions;
+        helpers;
+    }
+    
+    subgraph cluster_1 {
+        label = "lang";
+        labeljust = "l";
+        style = dotted;
+        variables -> definitions;
+        structs -> definitions;
+        functions -> helpers;
+    }
+    
+    subgraph cluster_0 {
+        label = "lang";
+        labeljust = "l";
+        style = dotted;
+        semantics -> variables;
+        semantics -> structs;
+        semantics -> functions;
+        eval -> variables;
+        eval -> structs;
+        eval -> functions;
+    }
+}
