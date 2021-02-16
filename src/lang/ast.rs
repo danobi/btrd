@@ -77,7 +77,7 @@ impl BinaryExpression {
 
 #[derive(Debug, PartialEq)]
 pub enum Constant {
-    Integer(i64),
+    Integer(i128),
     Boolean(bool),
 }
 

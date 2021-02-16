@@ -116,7 +116,7 @@ fn constant<'a>() -> Parser<'a, char, Expression> {
     let number = (sym('-').opt() + integer)
         .collect()
         .map(String::from_iter)
-        .convert(|s| i64::from_str(&s));
+        .convert(|s| i128::from_str(&s));
     let constant = number.map(Constant::Integer)
         | tag("true").map(|_| Constant::Boolean(true))
         | tag("false").map(|_| Constant::Boolean(false));

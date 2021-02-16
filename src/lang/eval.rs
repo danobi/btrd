@@ -11,16 +11,16 @@ use crate::lang::variables::Variables;
 
 #[derive(Clone, PartialEq)]
 enum Value {
-    /// All integers are internally represented as 64 bit signed to keep things simple
+    /// All integers are internally represented as 128 bit signed to keep things simple
     ///
     /// Any conversion errors (eg. during demotion, to unsigned) will trigger runtime errors
-    Integer(i64),
+    Integer(i128),
     String(String),
     Boolean(bool),
 }
 
 impl Value {
-    fn into_integer(self) -> Result<i64> {
+    fn into_integer(self) -> Result<i128> {
         match self {
             Value::Integer(i) => Ok(i),
             _ => bail!("Value is not integer -- semantic analysis bug (tell Daniel)"),
