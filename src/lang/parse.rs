@@ -35,7 +35,7 @@ use std::str::FromStr;
 
 use pom::parser::{call, end, is_a, list, none_of, one_of, sym, tag, Parser};
 
-use crate::ast::*;
+use crate::lang::ast::*;
 
 /// Macro to left fold a series of binary expressions
 ///

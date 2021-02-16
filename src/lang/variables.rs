@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::ast::Identifier;
+use crate::lang::ast::Identifier;
 
 pub struct Variables<T> {
     inner: Vec<BTreeMap<Identifier, T>>,

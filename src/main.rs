@@ -5,15 +5,11 @@ use rustyline::{config::Config as EditorConfig, Editor, Helper};
 use simplelog::{Config as LogConfig, LevelFilter, SimpleLogger};
 use structopt::StructOpt;
 
-mod ast;
-mod eval;
-mod parse;
-mod repl;
-mod semantics;
-mod variables;
+mod input;
+mod lang;
 
-use eval::{Eval, EvalResult};
-use repl::ReplHelper;
+use input::ReplHelper;
+use lang::eval::{Eval, EvalResult};
 
 const HISTORY_FILE: &str = ".btrd_history";
 const PROMPT: &str = "(btrd) ";
@@ -81,7 +77,7 @@ fn main() -> Result<()> {
     loop {
         match editor.readline(PROMPT) {
             Ok(line) => {
-                let fixed = repl::fixup_input(&line);
+                let fixed = input::fixup_input(&line);
 
                 info!("read: {}", line.escape_debug());
                 info!("cleaned: {}", fixed.escape_debug());

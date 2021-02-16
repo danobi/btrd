@@ -4,10 +4,10 @@ use std::io::Write;
 
 use anyhow::{anyhow, bail, Result};
 
-use crate::ast::*;
-use crate::parse::parse;
-use crate::semantics::SemanticAnalyzer;
-use crate::variables::Variables;
+use crate::lang::ast::*;
+use crate::lang::parse::parse;
+use crate::lang::semantics::SemanticAnalyzer;
+use crate::lang::variables::Variables;
 
 #[derive(Clone, PartialEq)]
 enum Value {

@@ -15,8 +15,8 @@ use std::fmt;
 
 use anyhow::{anyhow, bail, ensure, Result};
 
-use crate::ast::*;
-use crate::variables::Variables;
+use crate::lang::ast::*;
+use crate::lang::variables::Variables;
 
 #[derive(PartialEq, Clone)]
 pub struct IntegerType {}
@@ -369,7 +369,7 @@ fn analyze(stmts: &[Statement]) -> Result<()> {
 
 #[cfg(test)]
 fn parse(prog: &str) -> Vec<Statement> {
-    use crate::parse::parse;
+    use crate::lang::parse::parse;
     parse(prog).unwrap()
 }
 
