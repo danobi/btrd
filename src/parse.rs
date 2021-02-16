@@ -379,7 +379,7 @@ fn stmt<'a>() -> Parser<'a, char, Statement> {
     let stmt_semicolon =
         (builtin_stmt() | jump_stmt() | assign_stmt() | expr_stmt()) - space() - sym(';');
 
-    space() * (stmt_semicolon | block_stmt())
+    space() * (stmt_semicolon | block_stmt()) - (space() * sym(';')).repeat(0..)
 }
 
 /// Parse a series of statements
@@ -1318,38 +1318,51 @@ fn test_builtin_stmt() {
 #[test]
 fn test_program() {
     {
-        let data = vec![(
-            "x = 3; if x { x = 5; } print x;",
-            vec![
-                Statement::AssignStatement(
+        let data = vec![
+            (
+                "x = 3; if x { x = 5; } print x;",
+                vec![
+                    Statement::AssignStatement(
+                        Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
+                            "x".to_string(),
+                        ))),
+                        Expression::PrimaryExpression(PrimaryExpression::Constant(
+                            Constant::Integer(3),
+                        )),
+                    ),
+                    Statement::BlockStatement(BlockStatement::If(
+                        Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
+                            "x".to_string(),
+                        ))),
+                        vec![Statement::AssignStatement(
+                            Expression::PrimaryExpression(PrimaryExpression::Identifier(
+                                Identifier("x".to_string()),
+                            )),
+                            Expression::PrimaryExpression(PrimaryExpression::Constant(
+                                Constant::Integer(5),
+                            )),
+                        )],
+                        Vec::new(),
+                    )),
+                    Statement::BuiltinStatement(BuiltinStatement::Print(
+                        Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
+                            "x".to_string(),
+                        ))),
+                    )),
+                ],
+            ),
+            (
+                "x = 3;;;;",
+                vec![Statement::AssignStatement(
                     Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
                         "x".to_string(),
                     ))),
                     Expression::PrimaryExpression(PrimaryExpression::Constant(Constant::Integer(
                         3,
                     ))),
-                ),
-                Statement::BlockStatement(BlockStatement::If(
-                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
-                        "x".to_string(),
-                    ))),
-                    vec![Statement::AssignStatement(
-                        Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
-                            "x".to_string(),
-                        ))),
-                        Expression::PrimaryExpression(PrimaryExpression::Constant(
-                            Constant::Integer(5),
-                        )),
-                    )],
-                    Vec::new(),
-                )),
-                Statement::BuiltinStatement(BuiltinStatement::Print(
-                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
-                        "x".to_string(),
-                    ))),
-                )),
-            ],
-        )];
+                )],
+            ),
+        ];
 
         for (input, expected) in data {
             assert_eq!(parse(input), Ok(expected));
