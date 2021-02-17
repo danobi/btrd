@@ -70,7 +70,7 @@ pub struct SemanticAnalyzer {
 impl SemanticAnalyzer {
     pub fn new() -> Self {
         Self {
-            variables: Variables::new(),
+            variables: Variables::new(|_| Type::Integer(IntegerType {})),
             loop_depth: 0,
         }
     }

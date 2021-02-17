@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::btrfs::definitions::CONSTANTS;
 use crate::lang::ast::Identifier;
 
 pub struct Variables<T> {
@@ -7,10 +8,17 @@ pub struct Variables<T> {
 }
 
 impl<T> Variables<T> {
-    pub fn new() -> Self {
-        Variables {
-            inner: vec![BTreeMap::default()],
+    pub fn new(constant_constructor: fn(i128) -> T) -> Self {
+        let mut map = BTreeMap::default();
+
+        for constant in &*CONSTANTS {
+            map.insert(
+                Identifier(constant.name.to_string()),
+                constant_constructor(constant.value),
+            );
         }
+
+        Variables { inner: vec![map] }
     }
 
     pub fn push_scope(&mut self) {

@@ -437,7 +437,7 @@ impl<'a> Eval<'a> {
             sink,
             interactive,
             semantics: SemanticAnalyzer::new(),
-            variables: Variables::new(),
+            variables: Variables::new(Value::Integer),
         }
     }
 
