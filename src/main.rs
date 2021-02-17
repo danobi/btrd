@@ -5,6 +5,7 @@ use rustyline::{config::Config as EditorConfig, Editor, Helper};
 use simplelog::{Config as LogConfig, LevelFilter, SimpleLogger};
 use structopt::StructOpt;
 
+mod btrfs;
 mod input;
 mod lang;
 
