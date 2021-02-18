@@ -3,6 +3,10 @@
 //! Useful references are /usr/include/linux/btrfs_tree.h and
 //! https://github.com/btrfs/btrfs-dev-docs/blob/master/tree-items.txt .
 //!
+//! NB: Nested structs must also be included as a top level struct. Otherwise, chained field
+//! accesses may not work (ie for `struct_foo.nested.field`, `struct_foo.nested` may not be
+//! resolved as a valid struct if the type of `struct_foo.nested` is not found in `STRUCTS`).
+//!
 //! Note that we do not handle trailing structures yet. IOW, if a structure has trailing elements
 //! (the type of which depend on the primary structure), it's not handled yet. There are plans to
 //! do so.
@@ -452,6 +456,34 @@ lazy_static! {
             },
         ],
     };
+    static ref ANON_STRUCT_0_BTRFS_DISK_BALANCE_ARGS: Struct = Struct {
+        name: "_anon_struct_0_btrfs_disk_balance_args",
+        key_match: |_, _, _| false,
+        fields: vec![
+            Field {
+                name: Some("usage_min"),
+                ty: Type::U32,
+            },
+            Field {
+                name: Some("usage_max"),
+                ty: Type::U32,
+            },
+        ],
+    };
+    static ref ANON_STRUCT_1_BTRFS_DISK_BALANCE_ARGS: Struct = Struct {
+        name: "_anon_struct_1_btrfs_disk_balance_args",
+        key_match: |_, _, _| false,
+        fields: vec![
+            Field {
+                name: Some("limit_min"),
+                ty: Type::U32,
+            },
+            Field {
+                name: Some("limit_max"),
+                ty: Type::U32,
+            },
+        ],
+    };
     static ref BTRFS_DISK_BALANCE_ARGS: Struct = Struct {
          name: "btrfs_disk_balance_args",
          key_match: |_, _, _| false,
@@ -471,20 +503,7 @@ lazy_static! {
                         },
                         Field {
                             name: None,
-                            ty: Type::Struct(Struct {
-                                name: "_anon_struct_0_btrfs_disk_balance_args",
-                                key_match: |_, _, _| false,
-                                fields: vec![
-                                    Field {
-                                        name: Some("usage_min"),
-                                        ty: Type::U32,
-                                    },
-                                    Field {
-                                        name: Some("usage_max"),
-                                        ty: Type::U32,
-                                    },
-                                ],
-                            })
+                            ty: Type::Struct(ANON_STRUCT_0_BTRFS_DISK_BALANCE_ARGS.clone())
                         },
                     ],
                 })
@@ -528,20 +547,7 @@ lazy_static! {
                         },
                         Field {
                             name: None,
-                            ty: Type::Struct(Struct {
-                                name: "_anon_struct_1_btrfs_disk_balance_args",
-                                key_match: |_, _, _| false,
-                                fields: vec![
-                                    Field {
-                                        name: Some("limit_min"),
-                                        ty: Type::U32,
-                                    },
-                                    Field {
-                                        name: Some("limit_max"),
-                                        ty: Type::U32,
-                                    },
-                                ],
-                            })
+                            ty: Type::Struct(ANON_STRUCT_1_BTRFS_DISK_BALANCE_ARGS.clone())
                         },
                     ],
                 })
@@ -931,6 +937,8 @@ lazy_static! {
                 },
             ],
         },
+        ANON_STRUCT_0_BTRFS_DISK_BALANCE_ARGS.clone(),
+        ANON_STRUCT_1_BTRFS_DISK_BALANCE_ARGS.clone(),
         BTRFS_DISK_BALANCE_ARGS.clone(),
         Struct {
             name: "btrfs_balance_item",
