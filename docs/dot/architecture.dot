@@ -6,7 +6,7 @@ digraph F {
         labeljust = "l";
         style = dotted;
         definitions;
-        helpers;
+        fs;
     }
     
     subgraph cluster_1 {
@@ -15,7 +15,7 @@ digraph F {
         style = dotted;
         variables -> definitions;
         structs -> definitions;
-        functions -> helpers;
+        functions -> fs;
     }
     
     subgraph cluster_2 {

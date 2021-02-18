@@ -24,6 +24,6 @@ Generic language modules. Abstract syntax tree data structure, runtime
 evaluation, AST parsing, and semantic analysis.
 
 * `btrfs/defintions.rs`
-* `btrfs/helpers.rs`
+* `btrfs/fs.rs`
 
 Contains btrfs on-disk structure definitions and helpers to read data off disk.
