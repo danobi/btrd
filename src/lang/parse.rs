@@ -319,8 +319,22 @@ fn expr<'a>() -> Parser<'a, char, Expression> {
 }
 
 fn assign_stmt<'a>() -> Parser<'a, char, Statement> {
-    let assignment = expr() - space() - sym('=') + expr();
-    assignment.map(|(lhs, rhs)| Statement::AssignStatement(lhs, rhs))
+    let plus_equals = (expr() - space() - tag("+=") + expr()).map(|(lhs, rhs)| {
+        Statement::AssignStatement(
+            lhs.clone(),
+            Expression::BinaryExpression(BinaryExpression::Plus(Box::new(lhs), Box::new(rhs))),
+        )
+    });
+    let minus_equals = (expr() - space() - tag("-=") + expr()).map(|(lhs, rhs)| {
+        Statement::AssignStatement(
+            lhs.clone(),
+            Expression::BinaryExpression(BinaryExpression::Minus(Box::new(lhs), Box::new(rhs))),
+        )
+    });
+    let regular = (expr() - space() - sym('=') + expr())
+        .map(|(lhs, rhs)| Statement::AssignStatement(lhs, rhs));
+
+    plus_equals | minus_equals | regular
 }
 
 fn if_else_stmt<'a>() -> Parser<'a, char, Statement> {
@@ -1257,6 +1271,59 @@ fn test_assign_stmt() {
                         ))),
                         Box::new(Expression::PrimaryExpression(PrimaryExpression::Constant(
                             Constant::Integer(2),
+                        ))),
+                    )),
+                ),
+            ),
+            (
+                "x += 1;",
+                Statement::AssignStatement(
+                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
+                        "x".to_string(),
+                    ))),
+                    Expression::BinaryExpression(BinaryExpression::Plus(
+                        Box::new(Expression::PrimaryExpression(
+                            PrimaryExpression::Identifier(Identifier("x".to_string())),
+                        )),
+                        Box::new(Expression::PrimaryExpression(PrimaryExpression::Constant(
+                            Constant::Integer(1),
+                        ))),
+                    )),
+                ),
+            ),
+            (
+                "x -= 1;",
+                Statement::AssignStatement(
+                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
+                        "x".to_string(),
+                    ))),
+                    Expression::BinaryExpression(BinaryExpression::Minus(
+                        Box::new(Expression::PrimaryExpression(
+                            PrimaryExpression::Identifier(Identifier("x".to_string())),
+                        )),
+                        Box::new(Expression::PrimaryExpression(PrimaryExpression::Constant(
+                            Constant::Integer(1),
+                        ))),
+                    )),
+                ),
+            ),
+            (
+                "x += 1 + 2;",
+                Statement::AssignStatement(
+                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
+                        "x".to_string(),
+                    ))),
+                    Expression::BinaryExpression(BinaryExpression::Plus(
+                        Box::new(Expression::PrimaryExpression(
+                            PrimaryExpression::Identifier(Identifier("x".to_string())),
+                        )),
+                        Box::new(Expression::BinaryExpression(BinaryExpression::Plus(
+                            Box::new(Expression::PrimaryExpression(PrimaryExpression::Constant(
+                                Constant::Integer(1),
+                            ))),
+                            Box::new(Expression::PrimaryExpression(PrimaryExpression::Constant(
+                                Constant::Integer(2),
+                            ))),
                         ))),
                     )),
                 ),

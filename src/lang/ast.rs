@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UnaryExpression {
     /// `~`
     BitNot(Box<Expression>),
@@ -10,7 +10,7 @@ pub enum UnaryExpression {
     Minus(Box<Expression>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BinaryExpression {
     /// `+`
     Plus(Box<Expression>, Box<Expression>),
@@ -75,7 +75,7 @@ impl BinaryExpression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Constant {
     Integer(i128),
     Boolean(bool),
@@ -90,7 +90,7 @@ impl fmt::Display for Identifier {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PrimaryExpression {
     Identifier(Identifier),
     Constant(Constant),
@@ -98,7 +98,7 @@ pub enum PrimaryExpression {
     Paren(Box<Expression>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     PrimaryExpression(PrimaryExpression),
     /// (expression, field)
