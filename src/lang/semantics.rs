@@ -249,9 +249,22 @@ impl SemanticAnalyzer {
                     _ => bail!("Cannot access field '{}' on type '{}'", ident, ty),
                 }
             }
-            Expression::ArrayIndex(_expr, _index) => {
-                // TODO: implement after builtin functions are added
-                unimplemented!()
+            Expression::ArrayIndex(expr, index) => {
+                let expr_ty = self.eval_type(expr)?;
+                let index_ty = self.eval_type(index)?;
+
+                match index_ty {
+                    Type::Integer => (),
+                    t => bail!("Array index must be 'integer' type, found '{}'", t),
+                };
+
+                match expr_ty {
+                    Type::Array(t) => Ok(*t),
+                    t => bail!(
+                        "Array index can only be used on type 'array', found '{}'",
+                        t
+                    ),
+                }
             }
             Expression::FunctionCall(_expr, _args) => {
                 // TODO: implement when builtin functions are added
