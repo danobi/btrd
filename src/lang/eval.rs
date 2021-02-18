@@ -3,7 +3,9 @@ use std::fmt;
 use std::io::Write;
 
 use anyhow::{anyhow, bail, Result};
+use nix::unistd::getcwd;
 
+use crate::btrfs::fs::Fs;
 use crate::lang::ast::*;
 use crate::lang::parse::parse;
 use crate::lang::semantics::SemanticAnalyzer;
@@ -31,6 +33,13 @@ impl Value {
         match self {
             Value::Boolean(b) => Ok(b),
             _ => bail!("Value is not boolean -- semantic analysis bug (tell Daniel)"),
+        }
+    }
+
+    fn into_string(self) -> Result<String> {
+        match self {
+            Value::String(s) => Ok(s),
+            _ => bail!("Value is not string -- semantic analysis bug (tell Daniel)"),
         }
     }
 }
@@ -85,6 +94,7 @@ pub struct Eval<'a> {
     interactive: bool,
     semantics: SemanticAnalyzer,
     variables: Variables<Value>,
+    fs: Option<Fs>,
 }
 
 impl<'a> Eval<'a> {
@@ -300,7 +310,20 @@ impl<'a> Eval<'a> {
         match builtin {
             BuiltinStatement::Help => self.print_help(),
             BuiltinStatement::Quit => InternalEvalResult::Quit,
-            BuiltinStatement::Filesystem(_fs) => unimplemented!(),
+            BuiltinStatement::Filesystem(fs) => {
+                self.fs = match self.eval_expr(fs) {
+                    Ok(val) => match val.into_string() {
+                        Ok(path) => match Fs::new(path) {
+                            Ok(fs) => Some(fs),
+                            Err(e) => return InternalEvalResult::Err(e.to_string()),
+                        },
+                        Err(e) => return InternalEvalResult::Err(e.to_string()),
+                    },
+                    Err(e) => return InternalEvalResult::Err(e.to_string()),
+                };
+
+                InternalEvalResult::Ok
+            }
             BuiltinStatement::Print(expr) => match self.eval_expr(expr) {
                 Ok(v) => match writeln!(self.sink, "{}", v) {
                     Ok(_) => InternalEvalResult::Ok,
@@ -450,11 +473,17 @@ impl<'a> Eval<'a> {
     /// `interactive` sets whether or not expression statements should print the result (useful
     /// when human is at a REPL)
     pub fn new(sink: &'a mut dyn Write, interactive: bool) -> Self {
+        let fs = match getcwd() {
+            Ok(cwd) => Fs::new(cwd).ok(),
+            Err(_) => None,
+        };
+
         Self {
             sink,
             interactive,
             semantics: SemanticAnalyzer::new(),
             variables: Variables::new(Value::Integer),
+            fs,
         }
     }
 
