@@ -15,6 +15,8 @@ use std::fmt;
 
 use anyhow::{anyhow, bail, ensure, Result};
 
+use crate::btrfs::definitions::STRUCTS;
+use crate::btrfs::structs::{Field, Type as BtrfsType};
 use crate::lang::ast::*;
 use crate::lang::variables::Variables;
 
@@ -23,6 +25,9 @@ pub enum Type {
     Integer,
     String,
     Boolean,
+    Array(Box<Type>),
+    /// Name of the struct
+    Struct(String),
 }
 
 impl fmt::Display for Type {
@@ -31,6 +36,20 @@ impl fmt::Display for Type {
             Type::Integer => write!(f, "integer"),
             Type::String => write!(f, "string"),
             Type::Boolean => write!(f, "boolean"),
+            Type::Array(t) => write!(f, "[{}]", *t),
+            Type::Struct(name) => write!(f, "struct {}", name),
+        }
+    }
+}
+
+impl From<BtrfsType> for Type {
+    fn from(bty: BtrfsType) -> Self {
+        match bty {
+            BtrfsType::U8 | BtrfsType::U16 | BtrfsType::U32 | BtrfsType::U64 => Type::Integer,
+            BtrfsType::TrailingString => Type::String,
+            BtrfsType::Array(ty, _) => Type::Array(Box::new((*ty).into())),
+            BtrfsType::Struct(s) => Type::Struct(s.name.to_string()),
+            BtrfsType::Union(_) => panic!("Named unions are not supported"),
         }
     }
 }
@@ -171,9 +190,64 @@ impl SemanticAnalyzer {
     fn eval_type(&self, expr: &Expression) -> Result<Type> {
         match expr {
             Expression::PrimaryExpression(p) => self.eval_primary_expr_type(p),
-            Expression::FieldAccess(_expr, _field) => {
-                // TODO: implement after builtin functions are added
-                unimplemented!()
+            Expression::FieldAccess(expr, field) => {
+                let ident = match &**field {
+                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
+                        ident,
+                    ))) => ident,
+                    _ => bail!("Field in a field access must be an identifier"),
+                };
+
+                let ty = self.eval_type(&*expr)?;
+                match ty {
+                    Type::Struct(name) => {
+                        let s = STRUCTS
+                            .iter()
+                            .find(|entry| entry.name == name)
+                            .ok_or_else(|| anyhow!("Unknown struct '{}'", name))?;
+
+                        fn find_field<'a>(name: &str, field: &'a Field) -> Option<&'a Field> {
+                            if let Some(n) = field.name {
+                                if n == name {
+                                    return Some(field);
+                                }
+                            }
+
+                            match &field.ty {
+                                BtrfsType::Struct(s) => {
+                                    for f in &s.fields {
+                                        let res = find_field(name, f);
+                                        if res.is_some() {
+                                            return res;
+                                        }
+                                    }
+                                }
+                                BtrfsType::Union(s) => {
+                                    for f in &s.fields {
+                                        let res = find_field(name, f);
+                                        if res.is_some() {
+                                            return res;
+                                        }
+                                    }
+                                }
+                                _ => (),
+                            };
+
+                            None
+                        }
+
+                        let field = s
+                            .fields
+                            .iter()
+                            .find_map(|f| find_field(&ident, f))
+                            .ok_or_else(|| {
+                                anyhow!("Unknown field '{}' in struct '{}'", ident, s.name)
+                            })?;
+
+                        Ok(field.ty.clone().into())
+                    }
+                    _ => bail!("Cannot access field '{}' on type '{}'", ident, ty),
+                }
             }
             Expression::ArrayIndex(_expr, _index) => {
                 // TODO: implement after builtin functions are added
