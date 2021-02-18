@@ -415,10 +415,27 @@ impl<'a> Eval<'a> {
     }
 
     fn print_help(&mut self) -> InternalEvalResult {
-        let mut s = String::new();
+        let help = vec![
+            ("help", "Print help"),
+            ("quit", "Exit debugger"),
+            (
+                "filesystem <string>",
+                "Debug <string> (<string> must be a path to a mounted btrfs filesystem)",
+            ),
+            (
+                "print <expression>",
+                "Evaluate <expression> and print result",
+            ),
+        ];
 
-        s += "help\t\tPrint help\n";
-        s += "quit\t\tExit debugger\n";
+        let width = help
+            .iter()
+            .max_by_key(|p| p.0.len())
+            .map_or(0, |p| p.0.len() + 4);
+        let mut s = String::new();
+        for (l, r) in help {
+            s += &format!("{:width$}{}\n", l, r, width = width);
+        }
 
         match write!(self.sink, "{}", s) {
             Ok(_) => InternalEvalResult::Ok,
