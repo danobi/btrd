@@ -30,13 +30,29 @@ impl<'a> Runtime<'a> {
             Err(e) => return EvalResult::Err(e.to_string()),
         };
 
-        // Perform semantic analysis
-        match self.semantics.analyze(&stmts, &self.eval) {
-            Ok(_) => (),
-            Err(e) => return EvalResult::Err(e.to_string()),
-        };
+        // HACK: run semantic analysis and eval in lockstep, statement by statement.
+        //
+        // The reason we do this is b/c btrd is a statically typed language. However, the
+        // `search()` builtin's return type changes depending on the key used. The enable this type
+        // magic, we need to evaluate `key()`'s arguments and detemine the matching on-disk struct.
+        // And for evaluation to work correctly with variables, semantic analysis and eval must
+        // have the same view of the program state.
+        for i in 0..stmts.len() {
+            let stmt = &stmts[i..i + 1];
 
-        // Evaluate AST
-        self.eval.eval(&stmts)
+            // Perform semantic analysis
+            match self.semantics.analyze(stmt, &self.eval) {
+                Ok(_) => (),
+                Err(e) => return EvalResult::Err(e.to_string()),
+            };
+
+            // Evaluate AST
+            match self.eval.eval(stmt) {
+                EvalResult::Ok => (),
+                e => return e,
+            }
+        }
+
+        EvalResult::Ok
     }
 }
