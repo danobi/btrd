@@ -94,10 +94,10 @@ impl SemanticAnalyzer {
         let ty = match expr {
             PrimaryExpression::Identifier(ident) => {
                 let ty = self
-                .variables
-                .get(ident)
-                .ok_or_else(|| anyhow!("Unknown variable: {}", ident))?
-                .clone();
+                    .variables
+                    .get(ident)
+                    .ok_or_else(|| anyhow!("Unknown variable: {}", ident))?
+                    .clone();
 
                 self.seen_ident = true;
 
