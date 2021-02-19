@@ -26,11 +26,11 @@ use crate::lang::variables::Variables;
 #[derive(PartialEq, Clone)]
 struct StructType {
     /// Name of the struct
-    name: String,
+    name: &'static str,
     /// Set if this struct came from `key()`
     ///
     /// Points to the struct type a `search()` on the key should return
-    key_type: Option<String>,
+    key_type: Option<&'static str>,
 }
 
 #[derive(PartialEq, Clone)]
@@ -64,7 +64,7 @@ impl From<BtrfsType> for Type {
             BtrfsType::TrailingString => Type::String,
             BtrfsType::Array(ty, _) => Type::Array(Box::new((*ty).into())),
             BtrfsType::Struct(s) => Type::Struct(StructType {
-                name: s.name.to_string(),
+                name: s.name,
                 key_type: None,
             }),
             BtrfsType::Union(_) => panic!("Named unions are not supported"),
@@ -324,14 +324,14 @@ impl SemanticAnalyzer {
                                 }
 
                                 let mut st = StructType {
-                                    name: BTRFS_SEARCH_KEY.name.to_string(),
+                                    name: BTRFS_SEARCH_KEY.name,
                                     key_type: None,
                                 };
 
                                 // Find the struct that pairs with the key arguments
                                 for s in &*STRUCTS {
                                     if (s.key_match)(args_val[0], args_val[1], args_val[2]) {
-                                        st.key_type = Some(s.name.to_string());
+                                        st.key_type = Some(s.name);
                                     }
                                 }
 
@@ -365,7 +365,7 @@ impl SemanticAnalyzer {
                                         );
                                         if let Some(key_type) = &st.key_type {
                                             Ok(Type::Array(Box::new(Type::Struct(StructType {
-                                                name: key_type.to_string(),
+                                                name: key_type,
                                                 key_type: None,
                                             }))))
                                         } else {
