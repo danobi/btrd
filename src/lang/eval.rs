@@ -22,21 +22,21 @@ pub enum Value {
 }
 
 impl Value {
-    fn into_integer(self) -> Result<i128> {
+    pub fn into_integer(self) -> Result<i128> {
         match self {
             Value::Integer(i) => Ok(i),
             _ => bail!("Value is not integer -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    fn into_boolean(self) -> Result<bool> {
+    pub fn into_boolean(self) -> Result<bool> {
         match self {
             Value::Boolean(b) => Ok(b),
             _ => bail!("Value is not boolean -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    fn into_string(self) -> Result<String> {
+    pub fn into_string(self) -> Result<String> {
         match self {
             Value::String(s) => Ok(s),
             _ => bail!("Value is not string -- semantic analysis bug (tell Daniel)"),

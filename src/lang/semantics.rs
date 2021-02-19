@@ -15,12 +15,23 @@ use std::fmt;
 
 use anyhow::{anyhow, bail, ensure, Result};
 
-use crate::btrfs::definitions::{BTRFS_KEY, STRUCTS};
+use crate::btrfs::definitions::{BTRFS_SEARCH_KEY, STRUCTS};
 use crate::btrfs::structs::{Field, Type as BtrfsType};
 use crate::lang::ast::*;
 use crate::lang::eval::Eval;
 use crate::lang::functions::Function;
 use crate::lang::variables::Variables;
+
+/// Stores additional information about structs
+#[derive(PartialEq, Clone)]
+struct StructType {
+    /// Name of the struct
+    name: String,
+    /// Set if this struct came from `key()`
+    ///
+    /// Points to the struct type a `search()` on the key should return
+    key_type: Option<String>,
+}
 
 #[derive(PartialEq, Clone)]
 enum Type {
@@ -29,7 +40,7 @@ enum Type {
     Boolean,
     Array(Box<Type>),
     /// Name of the struct
-    Struct(String),
+    Struct(StructType),
     Function(Function),
 }
 
@@ -40,7 +51,7 @@ impl fmt::Display for Type {
             Type::String => write!(f, "string"),
             Type::Boolean => write!(f, "boolean"),
             Type::Array(t) => write!(f, "[{}]", *t),
-            Type::Struct(name) => write!(f, "struct {}", name),
+            Type::Struct(s) => write!(f, "struct {}", s.name),
             Type::Function(func) => write!(f, "{}()", func),
         }
     }
@@ -52,7 +63,10 @@ impl From<BtrfsType> for Type {
             BtrfsType::U8 | BtrfsType::U16 | BtrfsType::U32 | BtrfsType::U64 => Type::Integer,
             BtrfsType::TrailingString => Type::String,
             BtrfsType::Array(ty, _) => Type::Array(Box::new((*ty).into())),
-            BtrfsType::Struct(s) => Type::Struct(s.name.to_string()),
+            BtrfsType::Struct(s) => Type::Struct(StructType {
+                name: s.name.to_string(),
+                key_type: None,
+            }),
             BtrfsType::Union(_) => panic!("Named unions are not supported"),
         }
     }
@@ -204,11 +218,11 @@ impl SemanticAnalyzer {
 
                 let ty = self.eval_type(&*expr, eval)?;
                 match ty {
-                    Type::Struct(name) => {
+                    Type::Struct(st) => {
                         let s = STRUCTS
                             .iter()
-                            .find(|entry| entry.name == name)
-                            .ok_or_else(|| anyhow!("Unknown struct '{}'", name))?;
+                            .find(|entry| entry.name == st.name)
+                            .ok_or_else(|| anyhow!("Unknown struct '{}'", st.name))?;
 
                         fn find_field<'a>(name: &str, field: &'a Field) -> Option<&'a Field> {
                             if let Some(n) = field.name {
@@ -245,7 +259,7 @@ impl SemanticAnalyzer {
                             .iter()
                             .find_map(|f| find_field(&ident, f))
                             .ok_or_else(|| {
-                                anyhow!("Unknown field '{}' in struct '{}'", ident, s.name)
+                                anyhow!("Unknown field '{}' in 'struct {}'", ident, s.name)
                             })?;
 
                         Ok(field.ty.clone().into())
@@ -278,25 +292,80 @@ impl SemanticAnalyzer {
                 }
 
                 match expr_ty {
-                    Type::Function(f) => match f {
-                        Function::Key => {
-                            ensure!(args_ty.len() == 4, "'{}' requires 4 arguments", expr_ty);
-                            for i in 0..args_ty.len() {
+                    Type::Function(f) => {
+                        match f {
+                            Function::Key => {
+                                ensure!(args_ty.len() == 4, "'{}' requires 4 arguments", expr_ty);
+                                for i in 0..args_ty.len() {
+                                    ensure!(
+                                        args_ty[i] == Type::Integer,
+                                        "'{}'s argument {} must be '{}'",
+                                        expr_ty,
+                                        i,
+                                        Type::Integer
+                                    );
+                                }
+
+                                // Evalulate the key arguments
+                                let mut args_val = Vec::with_capacity(args.len());
+                                for arg in args {
+                                    args_val.push(eval.eval_expr(arg)?.into_integer()?);
+                                }
+
+                                let mut st = StructType {
+                                    name: BTRFS_SEARCH_KEY.name.to_string(),
+                                    key_type: None,
+                                };
+
+                                // Find the struct that pairs with the key arguments
+                                for s in &*STRUCTS {
+                                    if (s.key_match)(args_val[0], args_val[1], args_val[2]) {
+                                        st.key_type = Some(s.name.to_string());
+                                    }
+                                }
+
                                 ensure!(
-                                    args_ty[i] == Type::Integer,
-                                    "'{}'s argument {} must be '{}'",
+                                    st.key_type.is_some(),
+                                    "Could not find a matching on-disk struct for key: ({}, {}, {})",
+                                    args_val[0],
+                                    args_val[1],
+                                    args_val[2]);
+
+                                Ok(Type::Struct(st))
+                            }
+                            Function::Search => {
+                                ensure!(args_ty.len() == 2, "'{}' requires 2 arguments", expr_ty);
+                                ensure!(
+                                    args_ty[0] == Type::Integer,
+                                    "'{}'s first argument must be '{}'",
                                     expr_ty,
-                                    i,
                                     Type::Integer
                                 );
-                            }
 
-                            unimplemented!();
+                                let type_mismatch_msg = format!(
+                                    "'{}'s second argument must be 'struct {}'",
+                                    expr_ty, BTRFS_SEARCH_KEY.name
+                                );
+                                match &args_ty[1] {
+                                    Type::Struct(st) => {
+                                        ensure!(
+                                            st.name == BTRFS_SEARCH_KEY.name,
+                                            type_mismatch_msg
+                                        );
+                                        if let Some(key_type) = &st.key_type {
+                                            Ok(Type::Array(Box::new(Type::Struct(StructType {
+                                                name: key_type.to_string(),
+                                                key_type: None,
+                                            }))))
+                                        } else {
+                                            panic!("key() in search() has no key_type");
+                                        }
+                                    }
+                                    _ => bail!(type_mismatch_msg),
+                                }
+                            }
                         }
-                        Function::Search => {
-                            unimplemented!();
-                        }
-                    },
+                    }
                     t => bail!("Expected function for function call, found: '{}'", t),
                 }
             }
@@ -783,5 +852,45 @@ fn test_builtin() {
         "#;
         let stmts = parse(prog);
         assert!(analyze(&stmts).is_ok());
+    }
+}
+
+#[test]
+fn test_function_key() {
+    {
+        let prog = r#"
+            k = key(0, 0, 0, 0);
+        "#;
+        let stmts = parse(prog);
+        assert!(analyze(&stmts).is_err());
+    }
+    {
+        let prog = r#"
+            k = key(BTRFS_FIRST_CHUNK_TREE_OBJECTID, BTRFS_CHUNK_ITEM_KEY, 0, 0);
+            k = key(999999, BTRFS_DEV_EXTENT_KEY, 0, 0);
+        "#;
+        let stmts = parse(prog);
+        assert!(analyze(&stmts).is_err());
+    }
+    {
+        let prog = r#"
+            k = key(BTRFS_FIRST_CHUNK_TREE_OBJECTID, BTRFS_CHUNK_ITEM_KEY, 0, 0);
+            k2 = key(999999, BTRFS_DEV_EXTENT_KEY, 0, 0);
+        "#;
+        let stmts = parse(prog);
+        analyze(&stmts).expect("Semantic analysis failed");
+    }
+}
+
+#[test]
+fn test_function_search() {
+    {
+        let prog = r#"
+            k = key(BTRFS_FIRST_CHUNK_TREE_OBJECTID, BTRFS_CHUNK_ITEM_KEY, 0, 0);
+            v = search(0, k);
+            stripe_len = v[0].stripe_len;
+        "#;
+        let stmts = parse(prog);
+        analyze(&stmts).expect("Semantic analysis failed");
     }
 }

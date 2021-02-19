@@ -350,6 +350,44 @@ lazy_static! {
             },
         ],
     };
+    pub static ref BTRFS_SEARCH_KEY: Struct = Struct {
+        name: "_btrfs_ioctl_search_key",
+        key_match: |_, _, _| false,
+        fields: vec![
+            Field {
+                name: Some("min_objectid"),
+                ty: Type::U64,
+            },
+            Field {
+                name: Some("max_objectid"),
+                ty: Type::U64,
+            },
+            Field {
+                name: Some("min_type"),
+                ty: Type::U8,
+            },
+            Field {
+                name: Some("max_type"),
+                ty: Type::U8,
+            },
+            Field {
+                name: Some("min_offset"),
+                ty: Type::U64,
+            },
+            Field {
+                name: Some("max_offset"),
+                ty: Type::U64,
+            },
+            Field {
+                name: Some("min_transid"),
+                ty: Type::U64,
+            },
+            Field {
+                name: Some("max_transid"),
+                ty: Type::U64,
+            },
+        ],
+    };
     pub static ref BTRFS_KEY: Struct = Struct {
         name: "btrfs_key",
         key_match: |_, _, _| false,
