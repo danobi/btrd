@@ -776,7 +776,7 @@ lazy_static! {
                 },
                 Field {
                     name: Some("name"),
-                    ty: Type::TrailingString,
+                    ty: Type::TrailingString("name_len"),
                 },
             ],
         },
@@ -798,7 +798,7 @@ lazy_static! {
                 },
                 Field {
                     name: Some("name"),
-                    ty: Type::TrailingString,
+                    ty: Type::TrailingString("name_len"),
                 },
             ],
         },
@@ -840,11 +840,11 @@ lazy_static! {
                 },
                 Field {
                     name: Some("name"),
-                    ty: Type::TrailingString,
+                    ty: Type::TrailingString("name_len"),
                 },
                 Field {
                     name: Some("value"),
-                    ty: Type::TrailingString,
+                    ty: Type::TrailingString("data_len"),
                 },
             ],
         },
@@ -972,7 +972,7 @@ lazy_static! {
                 },
                 Field {
                     name: Some("name"),
-                    ty: Type::TrailingString,
+                    ty: Type::TrailingString("name_len"),
                 },
             ],
         },
@@ -1264,6 +1264,20 @@ mod test {
                         Type::Struct(_) | Type::Union(_) => (),
                         _ => assert!(false, "Anonymous field is not struct or union"),
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_trailing_string_len_fields_exist() {
+        for s in &*STRUCTS {
+            for field in &s.fields {
+                if let Type::TrailingString(field) = field.ty {
+                    assert!(s
+                        .fields
+                        .iter()
+                        .any(|f| f.name.map_or(false, |n| n == field)));
                 }
             }
         }

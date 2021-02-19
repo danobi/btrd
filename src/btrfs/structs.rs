@@ -17,7 +17,9 @@ pub enum Type {
     U32,
     /// NB: little endian
     U64,
-    TrailingString,
+    /// A non-nul terminated string at the end of the struct, param is the name of the field in the
+    /// struct that contains the length
+    TrailingString(&'static str),
     /// (type of elem, number of elems)
     Array(Box<Type>, usize),
     Struct(Struct),
@@ -34,7 +36,7 @@ impl Type {
             Type::U64 => 8,
             // A trailing string is always at the end of the struct -- it's not technically a
             // part of the struct itself so the size is 0
-            Type::TrailingString => 0,
+            Type::TrailingString(_) => 0,
             Type::Array(t, n) => t.size() * n,
             Type::Struct(s) => s.size(),
             Type::Union(u) => u.size(),

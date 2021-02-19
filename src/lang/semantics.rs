@@ -61,7 +61,7 @@ impl From<BtrfsType> for Type {
     fn from(bty: BtrfsType) -> Self {
         match bty {
             BtrfsType::U8 | BtrfsType::U16 | BtrfsType::U32 | BtrfsType::U64 => Type::Integer,
-            BtrfsType::TrailingString => Type::String,
+            BtrfsType::TrailingString(_) => Type::String,
             BtrfsType::Array(ty, _) => Type::Array(Box::new((*ty).into())),
             BtrfsType::Struct(s) => Type::Struct(StructType {
                 name: s.name,
