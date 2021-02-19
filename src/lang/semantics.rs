@@ -456,7 +456,9 @@ impl SemanticAnalyzer {
 
 #[cfg(test)]
 fn analyze(stmts: &[Statement]) -> Result<()> {
-    SemanticAnalyzer::new().analyze(stmts)
+    let mut stdout = std::io::stdout();
+    let eval = Eval::new(&mut stdout, false);
+    SemanticAnalyzer::new().analyze(stmts, &eval)
 }
 
 #[cfg(test)]
