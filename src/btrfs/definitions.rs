@@ -1284,10 +1284,13 @@ mod test {
         for s in &*STRUCTS {
             for field in &s.fields {
                 if let Type::TrailingString(field) = field.ty {
-                    assert!(s
-                        .fields
-                        .iter()
-                        .any(|f| f.name.map_or(false, |n| n == field)));
+                    assert!(s.fields.iter().any(|f| {
+                        f.name.map_or(false, |n| n == field)
+                            && (match f.ty {
+                                Type::U8 | Type::U16 | Type::U32 | Type::U64 => true,
+                                _ => false,
+                            })
+                    }));
                 }
             }
         }
