@@ -18,6 +18,7 @@ use anyhow::{anyhow, bail, ensure, Result};
 use crate::btrfs::definitions::{BTRFS_KEY, STRUCTS};
 use crate::btrfs::structs::{Field, Type as BtrfsType};
 use crate::lang::ast::*;
+use crate::lang::eval::Eval;
 use crate::lang::functions::Function;
 use crate::lang::variables::Variables;
 
@@ -70,7 +71,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn eval_primary_expr_type(&self, expr: &PrimaryExpression) -> Result<Type> {
+    fn eval_primary_expr_type(&self, expr: &PrimaryExpression, eval: &Eval) -> Result<Type> {
         let ty = match expr {
             PrimaryExpression::Identifier(ident) => self
                 .variables
@@ -82,13 +83,13 @@ impl SemanticAnalyzer {
                 Constant::Boolean(_) => Type::Boolean,
             },
             PrimaryExpression::Str(_) => Type::String,
-            PrimaryExpression::Paren(expr) => self.eval_type(expr)?,
+            PrimaryExpression::Paren(expr) => self.eval_type(expr, eval)?,
         };
 
         Ok(ty)
     }
 
-    fn eval_binop_type(&self, binop: &BinaryExpression) -> Result<Type> {
+    fn eval_binop_type(&self, binop: &BinaryExpression, eval: &Eval) -> Result<Type> {
         let ty = match binop {
             BinaryExpression::Plus(lhs, rhs)
             | BinaryExpression::Minus(lhs, rhs)
@@ -100,8 +101,8 @@ impl SemanticAnalyzer {
             | BinaryExpression::BitXor(lhs, rhs)
             | BinaryExpression::LeftShift(lhs, rhs)
             | BinaryExpression::RightShift(lhs, rhs) => {
-                let lhs_ty = self.eval_type(lhs)?;
-                let rhs_ty = self.eval_type(rhs)?;
+                let lhs_ty = self.eval_type(lhs, eval)?;
+                let rhs_ty = self.eval_type(rhs, eval)?;
 
                 match (&lhs_ty, &rhs_ty) {
                     (Type::Integer, Type::Integer) => Type::Integer,
@@ -117,8 +118,8 @@ impl SemanticAnalyzer {
             | BinaryExpression::LessThanEquals(lhs, rhs)
             | BinaryExpression::GreaterThan(lhs, rhs)
             | BinaryExpression::GreaterThanEquals(lhs, rhs) => {
-                let lhs_ty = self.eval_type(lhs)?;
-                let rhs_ty = self.eval_type(rhs)?;
+                let lhs_ty = self.eval_type(lhs, eval)?;
+                let rhs_ty = self.eval_type(rhs, eval)?;
 
                 match (&lhs_ty, &rhs_ty) {
                     (Type::Integer, Type::Integer) => Type::Boolean,
@@ -131,8 +132,8 @@ impl SemanticAnalyzer {
                 }
             }
             BinaryExpression::Equals(lhs, rhs) | BinaryExpression::NotEquals(lhs, rhs) => {
-                let lhs_ty = self.eval_type(lhs)?;
-                let rhs_ty = self.eval_type(rhs)?;
+                let lhs_ty = self.eval_type(lhs, eval)?;
+                let rhs_ty = self.eval_type(rhs, eval)?;
 
                 ensure!(
                     lhs_ty == rhs_ty,
@@ -144,8 +145,8 @@ impl SemanticAnalyzer {
                 Type::Boolean
             }
             BinaryExpression::LogicalOr(lhs, rhs) | BinaryExpression::LogicalAnd(lhs, rhs) => {
-                let lhs_ty = self.eval_type(lhs)?;
-                let rhs_ty = self.eval_type(rhs)?;
+                let lhs_ty = self.eval_type(lhs, eval)?;
+                let rhs_ty = self.eval_type(rhs, eval)?;
 
                 match (&lhs_ty, &rhs_ty) {
                     (Type::Boolean, Type::Boolean) => Type::Boolean,
@@ -162,17 +163,17 @@ impl SemanticAnalyzer {
         Ok(ty)
     }
 
-    fn eval_unary_type(&self, unop: &UnaryExpression) -> Result<Type> {
+    fn eval_unary_type(&self, unop: &UnaryExpression, eval: &Eval) -> Result<Type> {
         match unop {
             UnaryExpression::BitNot(e) => {
-                let ty = self.eval_type(&*e)?;
+                let ty = self.eval_type(&*e, eval)?;
                 match ty {
                     t @ Type::Integer => Ok(t),
                     t => bail!("Cannot take binary not of type {}", t),
                 }
             }
             UnaryExpression::Not(e) => {
-                let ty = self.eval_type(&*e)?;
+                let ty = self.eval_type(&*e, eval)?;
                 match ty {
                     // Integer conversion to boolean
                     Type::Integer => Ok(Type::Boolean),
@@ -181,7 +182,7 @@ impl SemanticAnalyzer {
                 }
             }
             UnaryExpression::Minus(e) => {
-                let ty = self.eval_type(&*e)?;
+                let ty = self.eval_type(&*e, eval)?;
                 match ty {
                     t @ Type::Integer => Ok(t),
                     t => bail!("Cannot take negative of type: {}", t),
@@ -190,9 +191,9 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn eval_type(&self, expr: &Expression) -> Result<Type> {
+    fn eval_type(&self, expr: &Expression, eval: &Eval) -> Result<Type> {
         match expr {
-            Expression::PrimaryExpression(p) => self.eval_primary_expr_type(p),
+            Expression::PrimaryExpression(p) => self.eval_primary_expr_type(p, eval),
             Expression::FieldAccess(expr, field) => {
                 let ident = match &**field {
                     Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
@@ -201,7 +202,7 @@ impl SemanticAnalyzer {
                     _ => bail!("Field in a field access must be an identifier"),
                 };
 
-                let ty = self.eval_type(&*expr)?;
+                let ty = self.eval_type(&*expr, eval)?;
                 match ty {
                     Type::Struct(name) => {
                         let s = STRUCTS
@@ -253,8 +254,8 @@ impl SemanticAnalyzer {
                 }
             }
             Expression::ArrayIndex(expr, index) => {
-                let expr_ty = self.eval_type(expr)?;
-                let index_ty = self.eval_type(index)?;
+                let expr_ty = self.eval_type(expr, eval)?;
+                let index_ty = self.eval_type(index, eval)?;
 
                 match index_ty {
                     Type::Integer => (),
@@ -270,10 +271,10 @@ impl SemanticAnalyzer {
                 }
             }
             Expression::FunctionCall(expr, args) => {
-                let expr_ty = self.eval_type(expr)?;
+                let expr_ty = self.eval_type(expr, eval)?;
                 let mut args_ty = Vec::with_capacity(args.len());
                 for arg in args {
-                    args_ty.push(self.eval_type(arg)?);
+                    args_ty.push(self.eval_type(arg, eval)?);
                 }
 
                 match expr_ty {
@@ -299,14 +300,14 @@ impl SemanticAnalyzer {
                     t => bail!("Expected function for function call, found: '{}'", t),
                 }
             }
-            Expression::BinaryExpression(b) => self.eval_binop_type(b),
-            Expression::UnaryExpression(u) => self.eval_unary_type(u),
+            Expression::BinaryExpression(b) => self.eval_binop_type(b, eval),
+            Expression::UnaryExpression(u) => self.eval_unary_type(u, eval),
         }
     }
 
-    fn analyze_stmts(&mut self, stmts: &[Statement]) -> Result<()> {
+    fn analyze_stmts(&mut self, stmts: &[Statement], eval: &Eval) -> Result<()> {
         for stmt in stmts {
-            self.analyze_stmt(stmt)?;
+            self.analyze_stmt(stmt, eval)?;
         }
 
         Ok(())
@@ -317,14 +318,15 @@ impl SemanticAnalyzer {
         cond: &Expression,
         true_body: &[Statement],
         false_body: &[Statement],
+        eval: &Eval,
     ) -> Result<()> {
-        match self.eval_type(cond)? {
+        match self.eval_type(cond, eval)? {
             Type::Boolean => (),
             _ => bail!("'if' condition must be a boolean type"),
         };
 
-        self.analyze_stmts(true_body)?;
-        self.analyze_stmts(false_body)?;
+        self.analyze_stmts(true_body, eval)?;
+        self.analyze_stmts(false_body, eval)?;
 
         Ok(())
     }
@@ -334,6 +336,7 @@ impl SemanticAnalyzer {
         _ident: &Expression,
         _range: &Expression,
         _stmts: &[Statement],
+        _eval: &Eval,
     ) -> Result<()> {
         bail!("For loops are currently unimplemented");
 
@@ -346,22 +349,22 @@ impl SemanticAnalyzer {
         // self.analyze_stmts(stmts)?;
     }
 
-    fn analyze_while(&mut self, cond: &Expression, stmts: &[Statement]) -> Result<()> {
-        match self.eval_type(cond)? {
+    fn analyze_while(&mut self, cond: &Expression, stmts: &[Statement], eval: &Eval) -> Result<()> {
+        match self.eval_type(cond, eval)? {
             Type::Boolean => (),
             _ => bail!("'while' condition must be a boolean type"),
         };
 
-        self.analyze_stmts(stmts)?;
+        self.analyze_stmts(stmts, eval)?;
 
         Ok(())
     }
 
-    fn analyze_block_stmt(&mut self, block: &BlockStatement) -> Result<()> {
+    fn analyze_block_stmt(&mut self, block: &BlockStatement, eval: &Eval) -> Result<()> {
         match block {
             BlockStatement::If(cond, true_body, false_body) => {
                 self.variables.push_scope();
-                let ret = self.analyze_if(cond, true_body, false_body);
+                let ret = self.analyze_if(cond, true_body, false_body, eval);
                 self.variables.pop_scope();
 
                 ret
@@ -370,7 +373,7 @@ impl SemanticAnalyzer {
                 self.loop_depth += 1;
                 self.variables.push_scope();
 
-                let ret = self.analyze_while(cond, stmts);
+                let ret = self.analyze_while(cond, stmts, eval);
 
                 self.loop_depth -= 1;
                 self.variables.pop_scope();
@@ -381,7 +384,7 @@ impl SemanticAnalyzer {
                 self.loop_depth += 1;
                 self.variables.push_scope();
 
-                let ret = self.analyze_for(ident, range, stmts);
+                let ret = self.analyze_for(ident, range, stmts, eval);
 
                 self.loop_depth -= 1;
                 self.variables.pop_scope();
@@ -391,11 +394,11 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_stmt(&mut self, stmt: &Statement) -> Result<()> {
+    fn analyze_stmt(&mut self, stmt: &Statement, eval: &Eval) -> Result<()> {
         match stmt {
             Statement::AssignStatement(lhs, rhs) => {
                 if let Expression::PrimaryExpression(PrimaryExpression::Identifier(ident)) = lhs {
-                    let rhs_type = self.eval_type(rhs)?;
+                    let rhs_type = self.eval_type(rhs, eval)?;
                     if let Some(lhs_type) = self.variables.get(ident) {
                         ensure!(
                             lhs_type == &rhs_type,
@@ -413,7 +416,7 @@ impl SemanticAnalyzer {
                     bail!("Must assign value to an identifier");
                 }
             }
-            Statement::BlockStatement(block) => self.analyze_block_stmt(block),
+            Statement::BlockStatement(block) => self.analyze_block_stmt(block, eval),
             Statement::JumpStatement(jump) => {
                 ensure!(self.loop_depth > 0, "Cannot '{}' outside of a loop", jump);
 
@@ -429,22 +432,22 @@ impl SemanticAnalyzer {
                     },
                     BuiltinStatement::Print(expr) => {
                         // Check that expression is valid -- `print` can print any type
-                        let _ = self.eval_type(expr)?;
+                        let _ = self.eval_type(expr, eval)?;
                         Ok(())
                     }
                 }
             }
             Statement::ExpressionStatement(expr) => {
                 // Just need to make sure the expression is valid
-                let _ = self.eval_type(expr)?;
+                let _ = self.eval_type(expr, eval)?;
                 Ok(())
             }
         }
     }
 
-    pub fn analyze(&mut self, stmts: &[Statement]) -> Result<()> {
+    pub fn analyze(&mut self, stmts: &[Statement], eval: &Eval) -> Result<()> {
         for stmt in stmts {
-            self.analyze_stmt(stmt)?;
+            self.analyze_stmt(stmt, eval)?;
         }
 
         Ok(())

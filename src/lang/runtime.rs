@@ -31,7 +31,7 @@ impl<'a> Runtime<'a> {
         };
 
         // Perform semantic analysis
-        match self.semantics.analyze(&stmts) {
+        match self.semantics.analyze(&stmts, &self.eval) {
             Ok(_) => (),
             Err(e) => return EvalResult::Err(e.to_string()),
         };

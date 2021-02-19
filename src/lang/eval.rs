@@ -11,7 +11,7 @@ use crate::lang::functions::Function;
 use crate::lang::variables::Variables;
 
 #[derive(Clone, PartialEq)]
-enum Value {
+pub enum Value {
     /// All integers are internally represented as 128 bit signed to keep things simple
     ///
     /// Any conversion errors (eg. during demotion, to unsigned) will trigger runtime errors
