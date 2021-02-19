@@ -350,7 +350,7 @@ lazy_static! {
             },
         ],
     };
-    static ref BTRFS_KEY: Struct = Struct {
+    pub static ref BTRFS_KEY: Struct = Struct {
         name: "btrfs_key",
         key_match: |_, _, _| false,
         fields: vec![

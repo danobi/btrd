@@ -15,9 +15,10 @@ use std::fmt;
 
 use anyhow::{anyhow, bail, ensure, Result};
 
-use crate::btrfs::definitions::STRUCTS;
+use crate::btrfs::definitions::{BTRFS_KEY, STRUCTS};
 use crate::btrfs::structs::{Field, Type as BtrfsType};
 use crate::lang::ast::*;
+use crate::lang::functions::Function;
 use crate::lang::variables::Variables;
 
 #[derive(PartialEq, Clone)]
@@ -28,6 +29,7 @@ pub enum Type {
     Array(Box<Type>),
     /// Name of the struct
     Struct(String),
+    Function(Function),
 }
 
 impl fmt::Display for Type {
@@ -38,6 +40,7 @@ impl fmt::Display for Type {
             Type::Boolean => write!(f, "boolean"),
             Type::Array(t) => write!(f, "[{}]", *t),
             Type::Struct(name) => write!(f, "struct {}", name),
+            Type::Function(func) => write!(f, "{}()", func),
         }
     }
 }
@@ -62,7 +65,7 @@ pub struct SemanticAnalyzer {
 impl SemanticAnalyzer {
     pub fn new() -> Self {
         Self {
-            variables: Variables::new(|_| Type::Integer),
+            variables: Variables::new(|_| Type::Integer, Type::Function),
             loop_depth: 0,
         }
     }
@@ -266,9 +269,35 @@ impl SemanticAnalyzer {
                     ),
                 }
             }
-            Expression::FunctionCall(_expr, _args) => {
-                // TODO: implement when builtin functions are added
-                unimplemented!()
+            Expression::FunctionCall(expr, args) => {
+                let expr_ty = self.eval_type(expr)?;
+                let mut args_ty = Vec::with_capacity(args.len());
+                for arg in args {
+                    args_ty.push(self.eval_type(arg)?);
+                }
+
+                match expr_ty {
+                    Type::Function(f) => match f {
+                        Function::Key => {
+                            ensure!(args_ty.len() == 4, "'{}' requires 4 arguments", expr_ty);
+                            for i in 0..args_ty.len() {
+                                ensure!(
+                                    args_ty[i] == Type::Integer,
+                                    "'{}'s argument {} must be '{}'",
+                                    expr_ty,
+                                    i,
+                                    Type::Integer
+                                );
+                            }
+
+                            unimplemented!();
+                        }
+                        Function::Search => {
+                            unimplemented!();
+                        }
+                    },
+                    t => bail!("Expected function for function call, found: '{}'", t),
+                }
             }
             Expression::BinaryExpression(b) => self.eval_binop_type(b),
             Expression::UnaryExpression(u) => self.eval_unary_type(u),

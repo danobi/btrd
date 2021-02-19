@@ -7,6 +7,7 @@ use nix::unistd::getcwd;
 
 use crate::btrfs::fs::Fs;
 use crate::lang::ast::*;
+use crate::lang::functions::Function;
 use crate::lang::parse::parse;
 use crate::lang::semantics::SemanticAnalyzer;
 use crate::lang::variables::Variables;
@@ -19,6 +20,7 @@ enum Value {
     Integer(i128),
     String(String),
     Boolean(bool),
+    Function(Function),
 }
 
 impl Value {
@@ -52,6 +54,7 @@ impl fmt::Display for Value {
             Value::Boolean(b) => {
                 write!(f, "{}", if *b { "true" } else { "false" })
             }
+            Value::Function(func) => write!(f, "{}()", func),
         }
     }
 }
@@ -482,7 +485,7 @@ impl<'a> Eval<'a> {
             sink,
             interactive,
             semantics: SemanticAnalyzer::new(),
-            variables: Variables::new(Value::Integer),
+            variables: Variables::new(Value::Integer, Value::Function),
             fs,
         }
     }
