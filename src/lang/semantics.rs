@@ -413,20 +413,26 @@ impl SemanticAnalyzer {
 
     fn analyze_for(
         &mut self,
-        _ident: &Expression,
-        _range: &Expression,
-        _stmts: &[Statement],
-        _eval: &Eval,
+        ident: &Expression,
+        range: &Expression,
+        stmts: &[Statement],
+        eval: &Eval,
     ) -> Result<()> {
-        bail!("For loops are currently unimplemented");
+        let ident = match ident {
+            Expression::PrimaryExpression(PrimaryExpression::Identifier(i)) => i,
+            _ => bail!("Temporary variable in a for-loop must be an identifier"),
+        };
 
-        // Check that temporary variable is an identifier
+        let range_ty = self.eval_type(range, eval)?;
+        match range_ty {
+            Type::Array(elem_ty) => self.variables.insert(ident.clone(), (*elem_ty).clone()),
+            _ => bail!(
+                "Expression in for loop must be iterable, found type '{}'",
+                range_ty
+            ),
+        };
 
-        // Add temporary variable to variable tracker
-
-        // Check expression is a range
-
-        // self.analyze_stmts(stmts)?;
+        self.analyze_stmts(stmts, eval)
     }
 
     fn analyze_while(&mut self, cond: &Expression, stmts: &[Statement], eval: &Eval) -> Result<()> {
@@ -591,6 +597,18 @@ fn test_jump_outside_loop() {
         let stmts = parse(prog);
         analyze(&stmts).expect("Semantic analysis failed")
     }
+    {
+        let prog = r#"
+            k = key(0, BTRFS_DEV_EXTENT_KEY, 0, 0);
+            v = search(0, k);
+            for s in v {
+                break;
+                continue;
+            }
+        "#;
+        let stmts = parse(prog);
+        analyze(&stmts).expect("Semantic analysis failed");
+    }
 }
 
 #[test]
@@ -627,6 +645,18 @@ fn test_variable_scope() {
     }
     {
         let prog = r#"
+            k = key(0, BTRFS_DEV_EXTENT_KEY, 0, 0);
+            v = search(0, k);
+            for s in v {
+                inner_var = 3;
+            }
+            outer_var = inner_var;
+        "#;
+        let stmts = parse(prog);
+        assert!(analyze(&stmts).is_err());
+    }
+    {
+        let prog = r#"
             while true {
                 inner_var = 3;
                 inner_var = 4;
@@ -634,6 +664,18 @@ fn test_variable_scope() {
         "#;
         let stmts = parse(prog);
         analyze(&stmts).expect("Semantic analysis failed")
+    }
+    {
+        let prog = r#"
+            k = key(0, BTRFS_DEV_EXTENT_KEY, 0, 0);
+            v = search(0, k);
+            for s in v {
+                inner_var = 3;
+                inner_var2 = inner_var;
+            }
+        "#;
+        let stmts = parse(prog);
+        analyze(&stmts).expect("Semantic analysis failed");
     }
 }
 
