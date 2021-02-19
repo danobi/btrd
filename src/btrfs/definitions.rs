@@ -1221,7 +1221,7 @@ lazy_static! {
 #[cfg(test)]
 mod test {
     use super::{CONSTANTS, STRUCTS};
-    use crate::btrfs::structs::Type;
+    use crate::btrfs::structs::{Field, Type};
     use std::collections::HashSet;
 
     #[test]
@@ -1235,14 +1235,24 @@ mod test {
 
     #[test]
     fn test_struct_field_names_unique() {
-        for s in &*STRUCTS {
-            let mut set = HashSet::new();
-            for field in &s.fields {
+        fn recurse_fields(set: &mut HashSet<&'static str>, fields: &[Field]) {
+            for field in fields {
                 if let Some(name) = field.name {
                     assert!(!set.contains(name));
                     set.insert(name);
+                } else {
+                    match &field.ty {
+                        Type::Struct(s) => recurse_fields(set, &s.fields),
+                        Type::Union(u) => recurse_fields(set, &u.fields),
+                        _ => assert!(false, "Non struct/union anon field"),
+                    }
                 }
             }
+        }
+
+        for s in &*STRUCTS {
+            let mut set = HashSet::new();
+            recurse_fields(&mut set, &s.fields);
         }
     }
 
