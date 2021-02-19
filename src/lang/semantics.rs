@@ -307,9 +307,9 @@ impl SemanticAnalyzer {
                         match f {
                             Function::Key => {
                                 ensure!(args_ty.len() == 4, "'{}' requires 4 arguments", expr_ty);
-                                for i in 0..args_ty.len() {
+                                for (i, arg_ty) in args_ty.iter().enumerate() {
                                     ensure!(
-                                        args_ty[i] == Type::Integer,
+                                        *arg_ty == Type::Integer,
                                         "'{}'s argument {} must be '{}'",
                                         expr_ty,
                                         i,
