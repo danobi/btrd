@@ -98,7 +98,7 @@ pub struct Eval<'a> {
 }
 
 impl<'a> Eval<'a> {
-    fn eval_primary_expr(&mut self, expr: &PrimaryExpression) -> Result<Value> {
+    fn eval_primary_expr(&self, expr: &PrimaryExpression) -> Result<Value> {
         let val = match expr {
             PrimaryExpression::Identifier(ident) => self
                 .variables
@@ -116,7 +116,7 @@ impl<'a> Eval<'a> {
         Ok(val)
     }
 
-    fn eval_binop_expr(&mut self, binop: &BinaryExpression) -> Result<Value> {
+    fn eval_binop_expr(&self, binop: &BinaryExpression) -> Result<Value> {
         match binop {
             BinaryExpression::Plus(lhs, rhs) => {
                 let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
@@ -265,7 +265,7 @@ impl<'a> Eval<'a> {
         }
     }
 
-    fn eval_unary_expr(&mut self, unary: &UnaryExpression) -> Result<Value> {
+    fn eval_unary_expr(&self, unary: &UnaryExpression) -> Result<Value> {
         match unary {
             UnaryExpression::BitNot(expr) => {
                 let expr_val = self.eval_expr(expr)?.into_integer()?;
@@ -286,7 +286,14 @@ impl<'a> Eval<'a> {
         }
     }
 
-    fn eval_expr(&mut self, expr: &Expression) -> Result<Value> {
+    /// HACK: we make this method public so that semantic analysis can evaluate `search()` function
+    /// arguments. `search()` returns different struct types depending on the search arguments --
+    /// this doesn't play nice with the static type system. So as a hack, we'll expose this method
+    /// to allow semantic analysis to "look ahead" and figure out the return type.
+    ///
+    /// This ought to be OK b/c expression evaluation does not mutate program state -- it's
+    /// idempotent. This is reflected in the `&self` function signature.
+    pub fn eval_expr(&self, expr: &Expression) -> Result<Value> {
         match expr {
             Expression::PrimaryExpression(p) => self.eval_primary_expr(p),
             Expression::FieldAccess(_expr, _field) => {
