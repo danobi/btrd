@@ -75,6 +75,10 @@ impl From<BtrfsType> for Type {
 pub struct SemanticAnalyzer {
     variables: Variables<Type>,
     loop_depth: u32,
+    /// Whether or not we've seen an identifier during analysis
+    ///
+    /// NB: caller must take care to reset before recursing
+    seen_ident: bool,
 }
 
 impl SemanticAnalyzer {
@@ -82,16 +86,23 @@ impl SemanticAnalyzer {
         Self {
             variables: Variables::new(|_| Type::Integer, Type::Function),
             loop_depth: 0,
+            seen_ident: false,
         }
     }
 
-    fn eval_primary_expr_type(&self, expr: &PrimaryExpression, eval: &Eval) -> Result<Type> {
+    fn eval_primary_expr_type(&mut self, expr: &PrimaryExpression, eval: &Eval) -> Result<Type> {
         let ty = match expr {
-            PrimaryExpression::Identifier(ident) => self
+            PrimaryExpression::Identifier(ident) => {
+                let ty = self
                 .variables
                 .get(ident)
                 .ok_or_else(|| anyhow!("Unknown variable: {}", ident))?
-                .clone(),
+                .clone();
+
+                self.seen_ident = true;
+
+                ty
+            }
             PrimaryExpression::Constant(c) => match c {
                 Constant::Integer(_) => Type::Integer,
                 Constant::Boolean(_) => Type::Boolean,
@@ -103,7 +114,7 @@ impl SemanticAnalyzer {
         Ok(ty)
     }
 
-    fn eval_binop_type(&self, binop: &BinaryExpression, eval: &Eval) -> Result<Type> {
+    fn eval_binop_type(&mut self, binop: &BinaryExpression, eval: &Eval) -> Result<Type> {
         let ty = match binop {
             BinaryExpression::Plus(lhs, rhs)
             | BinaryExpression::Minus(lhs, rhs)
@@ -177,7 +188,7 @@ impl SemanticAnalyzer {
         Ok(ty)
     }
 
-    fn eval_unary_type(&self, unop: &UnaryExpression, eval: &Eval) -> Result<Type> {
+    fn eval_unary_type(&mut self, unop: &UnaryExpression, eval: &Eval) -> Result<Type> {
         match unop {
             UnaryExpression::BitNot(e) => {
                 let ty = self.eval_type(&*e, eval)?;
@@ -205,7 +216,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn eval_type(&self, expr: &Expression, eval: &Eval) -> Result<Type> {
+    fn eval_type(&mut self, expr: &Expression, eval: &Eval) -> Result<Type> {
         match expr {
             Expression::PrimaryExpression(p) => self.eval_primary_expr_type(p, eval),
             Expression::FieldAccess(expr, field) => {
@@ -222,7 +233,7 @@ impl SemanticAnalyzer {
                         let s = STRUCTS
                             .iter()
                             .find(|entry| entry.name == st.name)
-                            .ok_or_else(|| anyhow!("Unknown struct '{}'", st.name))?;
+                            .ok_or_else(|| anyhow!("Unknown type 'struct {}'", st.name))?;
 
                         fn find_field<'a>(name: &str, field: &'a Field) -> Option<&'a Field> {
                             if let Some(n) = field.name {
@@ -466,8 +477,10 @@ impl SemanticAnalyzer {
     fn analyze_stmt(&mut self, stmt: &Statement, eval: &Eval) -> Result<()> {
         match stmt {
             Statement::AssignStatement(lhs, rhs) => {
+                let rhs_type = self.eval_type(rhs, eval)?;
+
+                // Handle whole-variable assignment
                 if let Expression::PrimaryExpression(PrimaryExpression::Identifier(ident)) = lhs {
-                    let rhs_type = self.eval_type(rhs, eval)?;
                     if let Some(lhs_type) = self.variables.get(ident) {
                         ensure!(
                             lhs_type == &rhs_type,
@@ -479,6 +492,22 @@ impl SemanticAnalyzer {
                     } else {
                         self.variables.insert(ident.clone(), rhs_type);
                     }
+
+                    return Ok(());
+                }
+
+                // Now handle partial-variable assignment (ie. `var.field = 123`)
+
+                self.seen_ident = false;
+                let lhs_type = self.eval_type(lhs, eval)?;
+
+                if self.seen_ident {
+                    ensure!(
+                        lhs_type == rhs_type,
+                        "Cannot assign type '{}' to type '{}'",
+                        rhs_type,
+                        lhs_type
+                    );
 
                     Ok(())
                 } else {
@@ -876,6 +905,14 @@ fn test_function_key() {
         let prog = r#"
             k = key(BTRFS_FIRST_CHUNK_TREE_OBJECTID, BTRFS_CHUNK_ITEM_KEY, 0, 0);
             k2 = key(999999, BTRFS_DEV_EXTENT_KEY, 0, 0);
+        "#;
+        let stmts = parse(prog);
+        analyze(&stmts).expect("Semantic analysis failed");
+    }
+    {
+        let prog = r#"
+            k = key(999999, BTRFS_DEV_EXTENT_KEY, 0, 0);
+            k.max_objectid = 10000000;
         "#;
         let stmts = parse(prog);
         analyze(&stmts).expect("Semantic analysis failed");

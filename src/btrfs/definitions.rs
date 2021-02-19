@@ -605,6 +605,7 @@ lazy_static! {
          ],
     };
     pub static ref STRUCTS: Vec<Struct> = vec![
+        BTRFS_SEARCH_KEY.clone(),
         BTRFS_KEY.clone(),
         Struct {
             name: "btrfs_dev_item",
