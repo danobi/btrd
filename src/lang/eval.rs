@@ -8,8 +8,6 @@ use nix::unistd::getcwd;
 use crate::btrfs::fs::Fs;
 use crate::lang::ast::*;
 use crate::lang::functions::Function;
-use crate::lang::parse::parse;
-use crate::lang::semantics::SemanticAnalyzer;
 use crate::lang::variables::Variables;
 
 #[derive(Clone, PartialEq)]
@@ -95,7 +93,6 @@ impl InternalEvalResult {
 pub struct Eval<'a> {
     sink: &'a mut dyn Write,
     interactive: bool,
-    semantics: SemanticAnalyzer,
     variables: Variables<Value>,
     fs: Option<Fs>,
 }
@@ -484,26 +481,12 @@ impl<'a> Eval<'a> {
         Self {
             sink,
             interactive,
-            semantics: SemanticAnalyzer::new(),
             variables: Variables::new(Value::Integer, Value::Function),
             fs,
         }
     }
 
-    pub fn eval(&mut self, cmd: &str) -> EvalResult {
-        // Parse input into AST
-        let stmts = match parse(cmd) {
-            Ok(s) => s,
-            Err(e) => return EvalResult::Err(e.to_string()),
-        };
-
-        // Perform semantic analysis
-        match self.semantics.analyze(&stmts) {
-            Ok(_) => (),
-            Err(e) => return EvalResult::Err(e.to_string()),
-        };
-
-        // Evaluate AST
+    pub fn eval(&mut self, stmts: &[Statement]) -> EvalResult {
         for stmt in stmts {
             match self.eval_statement(&stmt) {
                 InternalEvalResult::Ok => (),
@@ -546,10 +529,11 @@ fn test_expression() {
         ("print 3 >= 3;", "true\n"),
     ];
 
+    use crate::lang::parse::parse;
     for (input, expected) in tests {
         let mut output = Vec::new();
         let mut eval = Eval::new(&mut output, false);
-        match eval.eval(input) {
+        match eval.eval(&parse(input).expect("Failed to parse")) {
             EvalResult::Ok => (),
             _ => assert!(false),
         };
@@ -574,10 +558,11 @@ fn test_if() {
         ),
     ];
 
+    use crate::lang::parse::parse;
     for (input, expected) in tests {
         let mut output = Vec::new();
         let mut eval = Eval::new(&mut output, false);
-        match eval.eval(input) {
+        match eval.eval(&parse(input).expect("Failed to parse")) {
             EvalResult::Ok => (),
             _ => assert!(false),
         };
@@ -595,10 +580,11 @@ fn test_loop() {
         "3\n",
     )];
 
+    use crate::lang::parse::parse;
     for (input, expected) in tests {
         let mut output = Vec::new();
         let mut eval = Eval::new(&mut output, false);
-        match eval.eval(input) {
+        match eval.eval(&parse(input).expect("Failed to parse")) {
             EvalResult::Ok => (),
             _ => assert!(false),
         };
@@ -611,9 +597,10 @@ fn test_loop() {
 
 #[test]
 fn test_interactive() {
+    use crate::lang::parse::parse;
     let mut output = Vec::new();
     let mut eval = Eval::new(&mut output, true);
-    match eval.eval("2+3;") {
+    match eval.eval(&parse("2+3;").expect("Failed to parse")) {
         EvalResult::Ok => (),
         _ => assert!(false),
     };

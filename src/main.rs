@@ -10,7 +10,8 @@ mod input;
 mod lang;
 
 use input::ReplHelper;
-use lang::eval::{Eval, EvalResult};
+use lang::eval::EvalResult;
+use lang::runtime::Runtime;
 
 const HISTORY_FILE: &str = ".btrd_history";
 const PROMPT: &str = "(btrd) ";
@@ -73,7 +74,7 @@ fn main() -> Result<()> {
     welcome();
 
     let mut stdout = std::io::stdout();
-    let mut eval = Eval::new(&mut stdout, true);
+    let mut runtime = Runtime::new(&mut stdout, true);
 
     loop {
         match editor.readline(PROMPT) {
@@ -83,7 +84,7 @@ fn main() -> Result<()> {
                 info!("read: {}", line.escape_debug());
                 info!("cleaned: {}", fixed.escape_debug());
 
-                match eval.eval(&fixed) {
+                match runtime.eval(&fixed) {
                     EvalResult::Ok => (),
                     EvalResult::Quit => break,
                     EvalResult::Err(e) => {
