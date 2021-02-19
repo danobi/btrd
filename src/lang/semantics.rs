@@ -23,7 +23,7 @@ use crate::lang::functions::Function;
 use crate::lang::variables::Variables;
 
 #[derive(PartialEq, Clone)]
-pub enum Type {
+enum Type {
     Integer,
     String,
     Boolean,
