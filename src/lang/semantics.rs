@@ -560,7 +560,7 @@ fn test_jump_outside_loop() {
             }
         "#;
         let stmts = parse(prog);
-        assert!(analyze(&stmts).is_ok());
+        analyze(&stmts).expect("Semantic analysis failed")
     }
 }
 
@@ -580,7 +580,7 @@ fn test_assign_var_different_types() {
             var = 2;
         "#;
         let stmts = parse(prog);
-        assert!(analyze(&stmts).is_ok());
+        analyze(&stmts).expect("Semantic analysis failed")
     }
 }
 
@@ -604,7 +604,7 @@ fn test_variable_scope() {
             }
         "#;
         let stmts = parse(prog);
-        assert!(analyze(&stmts).is_ok());
+        analyze(&stmts).expect("Semantic analysis failed")
     }
 }
 
@@ -652,7 +652,7 @@ fn test_unops() {
             !!!!!5;
         "#;
         let stmts = parse(prog);
-        assert!(analyze(&stmts).is_ok());
+        analyze(&stmts).expect("Semantic analysis failed")
     }
     {
         let prog = r#"
@@ -663,7 +663,7 @@ fn test_unops() {
             --~~~5;
         "#;
         let stmts = parse(prog);
-        assert!(analyze(&stmts).is_ok());
+        analyze(&stmts).expect("Semantic analysis failed")
     }
     {
         let prog = r#"
@@ -671,7 +671,7 @@ fn test_unops() {
             --1;
         "#;
         let stmts = parse(prog);
-        assert!(analyze(&stmts).is_ok());
+        analyze(&stmts).expect("Semantic analysis failed")
     }
 }
 
@@ -828,7 +828,7 @@ fn test_binops() {
             (5 < 3) || false;
         "#;
         let stmts = parse(prog);
-        assert!(analyze(&stmts).is_ok());
+        analyze(&stmts).expect("Semantic analysis failed")
     }
 }
 
@@ -851,7 +851,7 @@ fn test_builtin() {
             print "asdf";
         "#;
         let stmts = parse(prog);
-        assert!(analyze(&stmts).is_ok());
+        analyze(&stmts).expect("Semantic analysis failed")
     }
 }
 
