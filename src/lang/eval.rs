@@ -189,9 +189,35 @@ impl Struct {
     }
 }
 
+fn indent(level: usize) -> String {
+    " ".repeat(level * 4)
+}
+
 impl fmt::Display for Struct {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unimplemented!();
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ret = String::new();
+
+        ret += &format!("struct {} {{\n", self.name);
+
+        for field in &self.fields {
+            let val = format!("{},", field.value);
+            let mut val_lines = val.lines();
+
+            ret += &format!(
+                "{}.{} = {}\n",
+                indent(1),
+                field.name,
+                val_lines.next().expect("Value has no display")
+            );
+
+            for line in val_lines {
+                ret += &format!("{}{}\n", indent(1), line);
+            }
+        }
+
+        ret += "}}";
+
+        write!(f, "{}", ret)
     }
 }
 
@@ -244,9 +270,12 @@ impl fmt::Display for Value {
                 let mut out = String::new();
                 out += "[\n";
                 for val in array {
-                    out += &format!("\t{},\n", val);
+                    let val_str = format!("{}", val);
+                    for line in val_str.lines() {
+                        out += &format!("{}{},\n", indent(1), line);
+                    }
                 }
-                out += "]\n";
+                out += "]";
 
                 write!(f, "{}", out)
             }
