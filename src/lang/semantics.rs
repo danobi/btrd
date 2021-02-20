@@ -320,7 +320,7 @@ impl SemanticAnalyzer {
                                 // Evalulate the key arguments
                                 let mut args_val = Vec::with_capacity(args.len());
                                 for arg in args {
-                                    args_val.push(eval.eval_expr(arg)?.into_integer()?);
+                                    args_val.push(eval.eval_expr(arg)?.as_integer()?);
                                 }
 
                                 let mut st = StructType {

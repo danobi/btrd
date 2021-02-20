@@ -146,7 +146,7 @@ impl Struct {
 
                 for processed_field in &ret.fields {
                     if processed_field.name == *n {
-                        let string_len = processed_field.value.into_integer()? as usize;
+                        let string_len = processed_field.value.as_integer()? as usize;
                         let end_of_struct: usize = bs.size() + trailing_data;
                         let end_of_str: usize = string_len + end_of_struct;
 
@@ -196,35 +196,35 @@ impl fmt::Display for Struct {
 }
 
 impl Value {
-    pub fn into_integer(&self) -> Result<i128> {
+    pub fn as_integer(&self) -> Result<i128> {
         match self {
             Value::Integer(i) => Ok(*i),
             _ => bail!("Value is not integer -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    pub fn into_boolean(&self) -> Result<bool> {
+    pub fn as_boolean(&self) -> Result<bool> {
         match self {
             Value::Boolean(b) => Ok(*b),
             _ => bail!("Value is not boolean -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    pub fn into_string(&self) -> Result<String> {
+    pub fn as_string(&self) -> Result<String> {
         match self {
             Value::String(s) => Ok(s.clone()),
             _ => bail!("Value is not string -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    fn into_vec(&self) -> Result<Vec<Value>> {
+    fn as_vec(&self) -> Result<Vec<Value>> {
         match self {
             Value::Array(v) => Ok(v.clone()),
             _ => bail!("Value is not array -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    fn into_struct(&self) -> Result<Struct> {
+    fn as_struct(&self) -> Result<Struct> {
         match self {
             Value::Struct(s) => Ok(s.clone()),
             _ => bail!("Value is not struct -- semantic analysis bug (tell Daniel)"),
@@ -318,8 +318,8 @@ impl<'a> Eval<'a> {
     fn eval_binop_expr(&self, binop: &BinaryExpression) -> Result<Value> {
         match binop {
             BinaryExpression::Plus(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 let res = lhs_val
                     .checked_add(rhs_val)
@@ -328,8 +328,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::Minus(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 let res = lhs_val
                     .checked_sub(rhs_val)
@@ -338,8 +338,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::Multiply(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 let res = lhs_val
                     .checked_mul(rhs_val)
@@ -348,8 +348,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::Divide(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 if rhs_val == 0 {
                     bail!("Divide by zero");
@@ -362,8 +362,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::Modulo(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 if rhs_val == 0 {
                     bail!("Divide by zero");
@@ -376,26 +376,26 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::BitOr(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 Ok(Value::Integer(lhs_val | rhs_val))
             }
             BinaryExpression::BitAnd(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 Ok(Value::Integer(lhs_val & rhs_val))
             }
             BinaryExpression::BitXor(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 Ok(Value::Integer(lhs_val ^ rhs_val))
             }
             BinaryExpression::LeftShift(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 let res = lhs_val
                     .checked_shl(rhs_val.try_into()?)
@@ -404,8 +404,8 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::RightShift(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 let res = lhs_val
                     .checked_shr(rhs_val.try_into()?)
@@ -414,26 +414,26 @@ impl<'a> Eval<'a> {
                 Ok(Value::Integer(res))
             }
             BinaryExpression::LessThan(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 Ok(Value::Boolean(lhs_val < rhs_val))
             }
             BinaryExpression::LessThanEquals(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 Ok(Value::Boolean(lhs_val <= rhs_val))
             }
             BinaryExpression::GreaterThan(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 Ok(Value::Boolean(lhs_val > rhs_val))
             }
             BinaryExpression::GreaterThanEquals(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
 
                 Ok(Value::Boolean(lhs_val >= rhs_val))
             }
@@ -450,14 +450,14 @@ impl<'a> Eval<'a> {
                 Ok(Value::Boolean(lhs_val != rhs_val))
             }
             BinaryExpression::LogicalOr(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_boolean()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_boolean()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_boolean()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_boolean()?;
 
                 Ok(Value::Boolean(lhs_val || rhs_val))
             }
             BinaryExpression::LogicalAnd(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.into_boolean()?;
-                let rhs_val = self.eval_expr(&rhs)?.into_boolean()?;
+                let lhs_val = self.eval_expr(&lhs)?.as_boolean()?;
+                let rhs_val = self.eval_expr(&rhs)?.as_boolean()?;
 
                 Ok(Value::Boolean(lhs_val && rhs_val))
             }
@@ -467,7 +467,7 @@ impl<'a> Eval<'a> {
     fn eval_unary_expr(&self, unary: &UnaryExpression) -> Result<Value> {
         match unary {
             UnaryExpression::BitNot(expr) => {
-                let expr_val = self.eval_expr(expr)?.into_integer()?;
+                let expr_val = self.eval_expr(expr)?.as_integer()?;
                 Ok(Value::Integer(!expr_val))
             }
             UnaryExpression::Not(expr) => {
@@ -479,7 +479,7 @@ impl<'a> Eval<'a> {
                 }
             }
             UnaryExpression::Minus(expr) => {
-                let expr_val = self.eval_expr(expr)?.into_integer()?;
+                let expr_val = self.eval_expr(expr)?.as_integer()?;
                 Ok(Value::Integer(-expr_val))
             }
         }
@@ -518,7 +518,7 @@ impl<'a> Eval<'a> {
             BuiltinStatement::Quit => InternalEvalResult::Quit,
             BuiltinStatement::Filesystem(fs) => {
                 self._fs = match self.eval_expr(fs) {
-                    Ok(val) => match val.into_string() {
+                    Ok(val) => match val.as_string() {
                         Ok(path) => match Fs::new(path) {
                             Ok(fs) => Some(fs),
                             Err(e) => return InternalEvalResult::Err(e.to_string()),
@@ -560,7 +560,7 @@ impl<'a> Eval<'a> {
             Statement::BlockStatement(block) => match block {
                 BlockStatement::If(cond, true_body, false_body) => {
                     let cond = match self.eval_expr(cond) {
-                        Ok(c) => match c.into_boolean() {
+                        Ok(c) => match c.as_boolean() {
                             Ok(v) => v,
                             Err(e) => return InternalEvalResult::Err(e.to_string()),
                         },
@@ -584,7 +584,7 @@ impl<'a> Eval<'a> {
                     let mut break_loop = false;
                     loop {
                         let cond = match self.eval_expr(cond) {
-                            Ok(c) => match c.into_boolean() {
+                            Ok(c) => match c.as_boolean() {
                                 Ok(v) => v,
                                 Err(e) => return InternalEvalResult::Err(e.to_string()),
                             },
@@ -867,22 +867,22 @@ fn test_struct_deserialize() {
         assert_eq!(interpreted.fields.len(), 4);
         assert_eq!(interpreted.fields[0].name, "one");
         assert_eq!(
-            interpreted.fields[0].value.into_integer().expect("not int"),
+            interpreted.fields[0].value.as_integer().expect("not int"),
             11111
         );
         assert_eq!(interpreted.fields[1].name, "two");
         assert_eq!(
-            interpreted.fields[1].value.into_integer().expect("not int"),
+            interpreted.fields[1].value.as_integer().expect("not int"),
             2222
         );
         assert_eq!(interpreted.fields[2].name, "three");
         assert_eq!(
-            interpreted.fields[2].value.into_integer().expect("not int"),
+            interpreted.fields[2].value.as_integer().expect("not int"),
             333
         );
         assert_eq!(interpreted.fields[3].name, "four");
         assert_eq!(
-            interpreted.fields[3].value.into_integer().expect("not int"),
+            interpreted.fields[3].value.as_integer().expect("not int"),
             4
         );
     }
@@ -920,16 +920,16 @@ fn test_struct_deserialize() {
         assert_eq!(interpreted.fields.len(), 2);
 
         assert_eq!(interpreted.fields[0].name, "one");
-        let vec = interpreted.fields[0].value.into_vec().expect("not vec");
-        assert_eq!(vec[0].into_integer().expect("not int"), 666);
-        assert_eq!(vec[1].into_integer().expect("not int"), 555);
-        assert_eq!(vec[2].into_integer().expect("not int"), 444);
-        assert_eq!(vec[3].into_integer().expect("not int"), 333);
-        assert_eq!(vec[4].into_integer().expect("not int"), 222);
+        let vec = interpreted.fields[0].value.as_vec().expect("not vec");
+        assert_eq!(vec[0].as_integer().expect("not int"), 666);
+        assert_eq!(vec[1].as_integer().expect("not int"), 555);
+        assert_eq!(vec[2].as_integer().expect("not int"), 444);
+        assert_eq!(vec[3].as_integer().expect("not int"), 333);
+        assert_eq!(vec[4].as_integer().expect("not int"), 222);
 
         assert_eq!(interpreted.fields[1].name, "two");
         assert_eq!(
-            interpreted.fields[1].value.into_integer().expect("not int"),
+            interpreted.fields[1].value.as_integer().expect("not int"),
             11111
         );
     }
@@ -993,25 +993,22 @@ fn test_struct_deserialize() {
 
         assert_eq!(interpreted.fields[0].name, "one");
         assert_eq!(
-            interpreted.fields[0].value.into_integer().expect("not int"),
+            interpreted.fields[0].value.as_integer().expect("not int"),
             012345,
         );
 
         assert_eq!(interpreted.fields[1].name, "two");
         assert_eq!(
-            interpreted.fields[1].value.into_integer().expect("not int"),
+            interpreted.fields[1].value.as_integer().expect("not int"),
             543210
         );
 
         assert_eq!(interpreted.fields[2].name, "inner");
-        let inner = interpreted.fields[2]
-            .value
-            .into_struct()
-            .expect("not struct");
+        let inner = interpreted.fields[2].value.as_struct().expect("not struct");
         assert_eq!(inner.name, "inner_struct");
         assert_eq!(inner.fields.len(), 1);
         assert_eq!(inner.fields[0].name, "three");
-        assert_eq!(inner.fields[0].value.into_integer().expect("not int"), 3);
+        assert_eq!(inner.fields[0].value.as_integer().expect("not int"), 3);
     }
     {
         use crate::btrfs::structs::Union as BtrfsUnion;
@@ -1091,13 +1088,13 @@ fn test_struct_deserialize() {
 
         assert_eq!(interpreted.fields[1].name, "two");
         assert_eq!(
-            interpreted.fields[1].value.into_integer().expect("not int"),
+            interpreted.fields[1].value.as_integer().expect("not int"),
             88888888888
         );
 
         assert_eq!(interpreted.fields[2].name, "three");
         assert_eq!(
-            interpreted.fields[2].value.into_integer().expect("not int"),
+            interpreted.fields[2].value.as_integer().expect("not int"),
             7777777777777
         );
     }
@@ -1149,31 +1146,25 @@ fn test_struct_deserialize() {
 
         assert_eq!(interpreted.fields[0].name, "name_1_len");
         assert_eq!(
-            interpreted.fields[0].value.into_integer().expect("not int"),
+            interpreted.fields[0].value.as_integer().expect("not int"),
             5,
         );
 
         assert_eq!(interpreted.fields[1].name, "name_2_len");
         assert_eq!(
-            interpreted.fields[1].value.into_integer().expect("not int"),
+            interpreted.fields[1].value.as_integer().expect("not int"),
             7
         );
 
         assert_eq!(interpreted.fields[2].name, "name1");
         assert_eq!(
-            interpreted.fields[2]
-                .value
-                .into_string()
-                .expect("not string"),
+            interpreted.fields[2].value.as_string().expect("not string"),
             "hello"
         );
 
         assert_eq!(interpreted.fields[3].name, "name2");
         assert_eq!(
-            interpreted.fields[3]
-                .value
-                .into_string()
-                .expect("not string"),
+            interpreted.fields[3].value.as_string().expect("not string"),
             "world12"
         );
     }
