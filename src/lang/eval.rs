@@ -2,13 +2,26 @@ use std::convert::TryInto;
 use std::fmt;
 use std::io::Write;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use nix::unistd::getcwd;
 
 use crate::btrfs::fs::Fs;
+use crate::btrfs::structs::{Field as BtrfsField, Struct as BtrfsStruct, Type as BtrfsType};
 use crate::lang::ast::*;
 use crate::lang::functions::Function;
 use crate::lang::variables::Variables;
+
+#[derive(Clone, PartialEq)]
+pub struct StructField {
+    name: &'static str,
+    value: Value,
+}
+
+#[derive(Clone, PartialEq)]
+pub struct Struct {
+    name: &'static str,
+    fields: Vec<StructField>,
+}
 
 #[derive(Clone, PartialEq)]
 pub enum Value {
@@ -18,28 +31,203 @@ pub enum Value {
     Integer(i128),
     String(String),
     Boolean(bool),
+    Array(Vec<Value>),
     Function(Function),
+    Struct(Struct),
+}
+
+impl BtrfsType {
+    /// Convert raw bytes into a `Value` based on `self`
+    ///
+    /// The first byte of `bytes` must begin where the field begins. `bytes` must also contain
+    /// _at_least_ `self.size()` bytes (more is ok).
+    fn to_value(&self, bytes: &[u8]) -> Result<Value> {
+        Ok(match self {
+            Self::U8 => Value::Integer(u8::from_le(bytes[0]).into()),
+            Self::U16 => Value::Integer(u16::from_le_bytes(bytes[0..2].try_into()?).into()),
+            Self::U32 => Value::Integer(u32::from_le_bytes(bytes[0..4].try_into()?).into()),
+            Self::U64 => Value::Integer(u64::from_le_bytes(bytes[0..8].try_into()?).into()),
+            Self::TrailingString(_) => {
+                panic!("Unhandled TrailingString -- should be handled at struct level")
+            }
+            Self::Array(t, n) => {
+                let tsize = t.size();
+                let mut ret = Vec::with_capacity(*n);
+                for i in 0..*n {
+                    ret.push(t.to_value(&bytes[i * tsize..])?);
+                }
+
+                Value::Array(ret)
+            }
+            Self::Struct(s) => Value::Struct(Struct::from_bytes(s, bytes)?),
+            // We do not support named unions, so translate a union type as a struct with fields
+            // all constructed from the same offset
+            Self::Union(u) => {
+                let mut ret = Struct {
+                    name: u.name,
+                    fields: Vec::with_capacity(u.fields.len()),
+                };
+
+                for field in &u.fields {
+                    ret.fields
+                        .append(&mut StructField::from_bytes(field, bytes)?);
+                }
+
+                Value::Struct(ret)
+            }
+        })
+    }
+}
+
+impl StructField {
+    /// Convert raw bytes into `StructField`s
+    ///
+    /// The first byte of `bytes` must begin where the field begins. `bytes` must also contain
+    /// _at_least_ `bf.size()` bytes (more is ok).
+    ///
+    /// Returns a vector b/c anonymous unions / structs are handled as fields of the parent
+    /// struct.
+    fn from_bytes(bf: &BtrfsField, bytes: &[u8]) -> Result<Vec<Self>> {
+        ensure!(
+            bf.ty.size() <= bytes.len(),
+            "Cannot interpret 'struct {}', not enough bytes provided ({} < {})",
+            if let Some(name) = bf.name {
+                name
+            } else {
+                "(anon)"
+            },
+            bytes.len(),
+            bf.ty.size()
+        );
+
+        let mut ret = Vec::new();
+        let field_val = bf.ty.to_value(bytes)?;
+
+        if let Some(name) = bf.name {
+            ret.push(StructField {
+                name,
+                value: field_val,
+            });
+        } else {
+            match field_val {
+                Value::Struct(mut s) => ret.append(&mut s.fields),
+                _ => bail!("Only structs can be used as anonymous fields"),
+            }
+        }
+
+        Ok(ret)
+    }
+}
+
+impl Struct {
+    /// Convert raw bytes into a `Struct`
+    ///
+    /// The first byte of `bytes` must begin where the struct begins. `bytes` must also contain
+    /// _at_least_ `bs.size()` bytes (more is ok).
+    fn from_bytes(bs: &BtrfsStruct, bytes: &[u8]) -> Result<Self> {
+        ensure!(
+            bs.size() <= bytes.len(),
+            "Cannot interpret 'struct {}', not enough bytes provided ({} < {})",
+            bs.name,
+            bytes.len(),
+            bs.size()
+        );
+
+        let mut ret = Struct {
+            name: bs.name,
+            fields: Vec::with_capacity(bs.fields.len()),
+        };
+
+        let mut offset: usize = 0;
+        let mut trailing_data: usize = 0;
+        for field in &bs.fields {
+            if let BtrfsType::TrailingString(n) = &field.ty {
+                let mut found = false;
+
+                for processed_field in &ret.fields {
+                    if processed_field.name == *n {
+                        let string_len = processed_field.value.into_integer()? as usize;
+                        let end_of_struct: usize = bs.size() + trailing_data;
+                        let end_of_str: usize = string_len + end_of_struct;
+
+                        // So the next trailing string starts at the right offset
+                        trailing_data += string_len;
+
+                        ensure!(
+                            end_of_str <= bytes.len(),
+                            "Cannot interpret 'struct {}', not enough bytes provided for string read ({} < {})",
+                            bs.name,
+                            bytes.len(),
+                            end_of_str
+                        );
+
+                        ret.fields.push(StructField {
+                            name: field
+                                .name
+                                .ok_or_else(|| anyhow!("TrailingString can't be anonymous"))?,
+                            value: Value::String(
+                                String::from_utf8_lossy(&bytes[end_of_struct..end_of_str])
+                                    .to_string(),
+                            ),
+                        });
+
+                        found = true;
+                        break;
+                    }
+                }
+
+                // Should not happen -- there are tests for this
+                ensure!(found, "Did not find string len field in struct");
+            } else {
+                let mut fields = StructField::from_bytes(field, &bytes[offset..])?;
+                ret.fields.append(&mut fields);
+                offset += field.ty.size();
+            }
+        }
+
+        Ok(ret)
+    }
+}
+
+impl fmt::Display for Struct {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unimplemented!();
+    }
 }
 
 impl Value {
-    pub fn into_integer(self) -> Result<i128> {
+    pub fn into_integer(&self) -> Result<i128> {
         match self {
-            Value::Integer(i) => Ok(i),
+            Value::Integer(i) => Ok(*i),
             _ => bail!("Value is not integer -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    pub fn into_boolean(self) -> Result<bool> {
+    pub fn into_boolean(&self) -> Result<bool> {
         match self {
-            Value::Boolean(b) => Ok(b),
+            Value::Boolean(b) => Ok(*b),
             _ => bail!("Value is not boolean -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    pub fn into_string(self) -> Result<String> {
+    pub fn into_string(&self) -> Result<String> {
         match self {
-            Value::String(s) => Ok(s),
+            Value::String(s) => Ok(s.clone()),
             _ => bail!("Value is not string -- semantic analysis bug (tell Daniel)"),
+        }
+    }
+
+    fn into_vec(&self) -> Result<Vec<Value>> {
+        match self {
+            Value::Array(v) => Ok(v.clone()),
+            _ => bail!("Value is not array -- semantic analysis bug (tell Daniel)"),
+        }
+    }
+
+    fn into_struct(&self) -> Result<Struct> {
+        match self {
+            Value::Struct(s) => Ok(s.clone()),
+            _ => bail!("Value is not struct -- semantic analysis bug (tell Daniel)"),
         }
     }
 }
@@ -52,7 +240,18 @@ impl fmt::Display for Value {
             Value::Boolean(b) => {
                 write!(f, "{}", if *b { "true" } else { "false" })
             }
+            Value::Array(array) => {
+                let mut out = String::new();
+                out += "[\n";
+                for val in array {
+                    out += &format!("\t{},\n", val);
+                }
+                out += "]\n";
+
+                write!(f, "{}", out)
+            }
             Value::Function(func) => write!(f, "{}()", func),
+            Value::Struct(s) => write!(f, "{}", s),
         }
     }
 }
@@ -94,7 +293,7 @@ pub struct Eval<'a> {
     sink: &'a mut dyn Write,
     interactive: bool,
     variables: Variables<Value>,
-    fs: Option<Fs>,
+    _fs: Option<Fs>,
 }
 
 impl<'a> Eval<'a> {
@@ -318,7 +517,7 @@ impl<'a> Eval<'a> {
             BuiltinStatement::Help => self.print_help(),
             BuiltinStatement::Quit => InternalEvalResult::Quit,
             BuiltinStatement::Filesystem(fs) => {
-                self.fs = match self.eval_expr(fs) {
+                self._fs = match self.eval_expr(fs) {
                     Ok(val) => match val.into_string() {
                         Ok(path) => match Fs::new(path) {
                             Ok(fs) => Some(fs),
@@ -489,7 +688,7 @@ impl<'a> Eval<'a> {
             sink,
             interactive,
             variables: Variables::new(Value::Integer, Value::Function),
-            fs,
+            _fs: fs,
         }
     }
 
@@ -612,4 +811,370 @@ fn test_interactive() {
         _ => assert!(false),
     };
     assert_eq!(String::from_utf8(output).expect("Output not utf-8"), "5\n");
+}
+
+#[cfg(test)]
+unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    ::std::slice::from_raw_parts((p as *const T) as *const u8, ::std::mem::size_of::<T>())
+}
+
+#[cfg(target_endian = "little")]
+#[test]
+fn test_struct_deserialize() {
+    {
+        let struct_def = BtrfsStruct {
+            name: "some_struct",
+            key_match: |_, _, _| false,
+            fields: vec![
+                BtrfsField {
+                    name: Some("one"),
+                    ty: BtrfsType::U64,
+                },
+                BtrfsField {
+                    name: Some("two"),
+                    ty: BtrfsType::U32,
+                },
+                BtrfsField {
+                    name: Some("three"),
+                    ty: BtrfsType::U16,
+                },
+                BtrfsField {
+                    name: Some("four"),
+                    ty: BtrfsType::U8,
+                },
+            ],
+        };
+
+        #[repr(C, packed)]
+        struct SomeStruct {
+            one: u64,
+            two: u32,
+            three: u16,
+            four: u8,
+        }
+
+        let s = SomeStruct {
+            one: 11111,
+            two: 2222,
+            three: 333,
+            four: 4,
+        };
+
+        let interpreted = Struct::from_bytes(&struct_def, unsafe { any_as_u8_slice(&s) })
+            .expect("Failed to interpret struct");
+
+        assert_eq!(interpreted.name, "some_struct");
+        assert_eq!(interpreted.fields.len(), 4);
+        assert_eq!(interpreted.fields[0].name, "one");
+        assert_eq!(
+            interpreted.fields[0].value.into_integer().expect("not int"),
+            11111
+        );
+        assert_eq!(interpreted.fields[1].name, "two");
+        assert_eq!(
+            interpreted.fields[1].value.into_integer().expect("not int"),
+            2222
+        );
+        assert_eq!(interpreted.fields[2].name, "three");
+        assert_eq!(
+            interpreted.fields[2].value.into_integer().expect("not int"),
+            333
+        );
+        assert_eq!(interpreted.fields[3].name, "four");
+        assert_eq!(
+            interpreted.fields[3].value.into_integer().expect("not int"),
+            4
+        );
+    }
+    {
+        let struct_def = BtrfsStruct {
+            name: "some_struct",
+            key_match: |_, _, _| false,
+            fields: vec![
+                BtrfsField {
+                    name: Some("one"),
+                    ty: BtrfsType::Array(Box::new(BtrfsType::U32), 5),
+                },
+                BtrfsField {
+                    name: Some("two"),
+                    ty: BtrfsType::U64,
+                },
+            ],
+        };
+
+        #[repr(C, packed)]
+        struct SomeStruct {
+            one: [u32; 5],
+            two: u64,
+        }
+
+        let s = SomeStruct {
+            one: [666, 555, 444, 333, 222],
+            two: 11111,
+        };
+
+        let interpreted = Struct::from_bytes(&struct_def, unsafe { any_as_u8_slice(&s) })
+            .expect("Failed to interpret struct");
+
+        assert_eq!(interpreted.name, "some_struct");
+        assert_eq!(interpreted.fields.len(), 2);
+
+        assert_eq!(interpreted.fields[0].name, "one");
+        let vec = interpreted.fields[0].value.into_vec().expect("not vec");
+        assert_eq!(vec[0].into_integer().expect("not int"), 666);
+        assert_eq!(vec[1].into_integer().expect("not int"), 555);
+        assert_eq!(vec[2].into_integer().expect("not int"), 444);
+        assert_eq!(vec[3].into_integer().expect("not int"), 333);
+        assert_eq!(vec[4].into_integer().expect("not int"), 222);
+
+        assert_eq!(interpreted.fields[1].name, "two");
+        assert_eq!(
+            interpreted.fields[1].value.into_integer().expect("not int"),
+            11111
+        );
+    }
+    {
+        let struct_def = BtrfsStruct {
+            name: "some_struct",
+            key_match: |_, _, _| false,
+            fields: vec![BtrfsField {
+                name: None,
+                ty: BtrfsType::Struct(BtrfsStruct {
+                    name: "_anon_struct",
+                    key_match: |_, _, _| false,
+                    fields: vec![
+                        BtrfsField {
+                            name: Some("one"),
+                            ty: BtrfsType::U64,
+                        },
+                        BtrfsField {
+                            name: Some("two"),
+                            ty: BtrfsType::U64,
+                        },
+                        BtrfsField {
+                            name: Some("inner"),
+                            ty: BtrfsType::Struct(BtrfsStruct {
+                                name: "inner_struct",
+                                key_match: |_, _, _| false,
+                                fields: vec![BtrfsField {
+                                    name: Some("three"),
+                                    ty: BtrfsType::U8,
+                                }],
+                            }),
+                        },
+                    ],
+                }),
+            }],
+        };
+
+        #[repr(C, packed)]
+        struct InnerStruct {
+            three: u8,
+        }
+
+        #[repr(C, packed)]
+        struct SomeStruct {
+            one: u64,
+            two: u64,
+            inner: InnerStruct,
+        }
+
+        let s = SomeStruct {
+            one: 012345,
+            two: 543210,
+            inner: InnerStruct { three: 3 },
+        };
+
+        let interpreted = Struct::from_bytes(&struct_def, unsafe { any_as_u8_slice(&s) })
+            .expect("Failed to interpret struct");
+
+        assert_eq!(interpreted.name, "some_struct");
+        assert_eq!(interpreted.fields.len(), 3);
+
+        assert_eq!(interpreted.fields[0].name, "one");
+        assert_eq!(
+            interpreted.fields[0].value.into_integer().expect("not int"),
+            012345,
+        );
+
+        assert_eq!(interpreted.fields[1].name, "two");
+        assert_eq!(
+            interpreted.fields[1].value.into_integer().expect("not int"),
+            543210
+        );
+
+        assert_eq!(interpreted.fields[2].name, "inner");
+        let inner = interpreted.fields[2]
+            .value
+            .into_struct()
+            .expect("not struct");
+        assert_eq!(inner.name, "inner_struct");
+        assert_eq!(inner.fields.len(), 1);
+        assert_eq!(inner.fields[0].name, "three");
+        assert_eq!(inner.fields[0].value.into_integer().expect("not int"), 3);
+    }
+    {
+        use crate::btrfs::structs::Union as BtrfsUnion;
+
+        let struct_def = BtrfsStruct {
+            name: "some_struct",
+            key_match: |_, _, _| false,
+            fields: vec![BtrfsField {
+                name: None,
+                ty: BtrfsType::Union(BtrfsUnion {
+                    name: "_anon_union",
+                    fields: vec![
+                        BtrfsField {
+                            name: Some("one"),
+                            ty: BtrfsType::U64,
+                        },
+                        BtrfsField {
+                            name: None,
+                            ty: BtrfsType::Struct(BtrfsStruct {
+                                name: "_anon_struct",
+                                key_match: |_, _, _| false,
+                                fields: vec![
+                                    BtrfsField {
+                                        name: Some("two"),
+                                        ty: BtrfsType::U64,
+                                    },
+                                    BtrfsField {
+                                        name: Some("three"),
+                                        ty: BtrfsType::U64,
+                                    },
+                                ],
+                            }),
+                        },
+                    ],
+                }),
+            }],
+        };
+
+        #[derive(Clone, Copy)]
+        #[repr(C, packed)]
+        struct AnonStruct {
+            two: u64,
+            three: u64,
+        }
+
+        #[repr(C, packed)]
+        union AnonUnion {
+            one: u64,
+            anon_struct: AnonStruct,
+        }
+
+        #[repr(C, packed)]
+        struct SomeStruct {
+            anon_union: AnonUnion,
+        }
+
+        let s = SomeStruct {
+            anon_union: AnonUnion {
+                anon_struct: AnonStruct {
+                    two: 88888888888,
+                    three: 7777777777777,
+                },
+            },
+        };
+
+        let interpreted = Struct::from_bytes(&struct_def, unsafe { any_as_u8_slice(&s) })
+            .expect("Failed to interpret struct");
+
+        assert_eq!(interpreted.name, "some_struct");
+        assert_eq!(interpreted.fields.len(), 3);
+
+        assert_eq!(interpreted.fields[0].name, "one");
+        match interpreted.fields[0].value {
+            Value::Integer(_) => (),
+            _ => assert!(false, "Not integer field"),
+        };
+
+        assert_eq!(interpreted.fields[1].name, "two");
+        assert_eq!(
+            interpreted.fields[1].value.into_integer().expect("not int"),
+            88888888888
+        );
+
+        assert_eq!(interpreted.fields[2].name, "three");
+        assert_eq!(
+            interpreted.fields[2].value.into_integer().expect("not int"),
+            7777777777777
+        );
+    }
+    {
+        let struct_def = BtrfsStruct {
+            name: "some_struct",
+            key_match: |_, _, _| false,
+            fields: vec![
+                BtrfsField {
+                    name: Some("name_1_len"),
+                    ty: BtrfsType::U16,
+                },
+                BtrfsField {
+                    name: Some("name_2_len"),
+                    ty: BtrfsType::U16,
+                },
+                BtrfsField {
+                    name: Some("name1"),
+                    ty: BtrfsType::TrailingString("name_1_len"),
+                },
+                BtrfsField {
+                    name: Some("name2"),
+                    ty: BtrfsType::TrailingString("name_2_len"),
+                },
+            ],
+        };
+
+        #[repr(C, packed)]
+        struct SomeStruct {
+            name_1_len: u16,
+            name_2_len: u16,
+        }
+
+        let s = SomeStruct {
+            name_1_len: 5,
+            name_2_len: 7,
+        };
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(unsafe { any_as_u8_slice(&s) });
+        bytes.extend_from_slice(&"hello".to_string().as_bytes());
+        bytes.extend_from_slice(&"world12".to_string().as_bytes());
+
+        let interpreted =
+            Struct::from_bytes(&struct_def, &bytes).expect("Failed to interpret struct");
+
+        assert_eq!(interpreted.name, "some_struct");
+        assert_eq!(interpreted.fields.len(), 4);
+
+        assert_eq!(interpreted.fields[0].name, "name_1_len");
+        assert_eq!(
+            interpreted.fields[0].value.into_integer().expect("not int"),
+            5,
+        );
+
+        assert_eq!(interpreted.fields[1].name, "name_2_len");
+        assert_eq!(
+            interpreted.fields[1].value.into_integer().expect("not int"),
+            7
+        );
+
+        assert_eq!(interpreted.fields[2].name, "name1");
+        assert_eq!(
+            interpreted.fields[2]
+                .value
+                .into_string()
+                .expect("not string"),
+            "hello"
+        );
+
+        assert_eq!(interpreted.fields[3].name, "name2");
+        assert_eq!(
+            interpreted.fields[3]
+                .value
+                .into_string()
+                .expect("not string"),
+            "world12"
+        );
+    }
 }

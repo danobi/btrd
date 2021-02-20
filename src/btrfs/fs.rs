@@ -12,7 +12,7 @@ const BTRFS_FSTYPE: i64 = 0x9123683e;
 /// Holds a refcount on the FS while alive and decrements when struct is dropped (to prevent FS
 /// from being unmounted while we're debugging)
 pub struct Fs {
-    fs: Dir,
+    _fs: Dir,
 }
 
 impl Fs {
@@ -30,6 +30,6 @@ impl Fs {
             path.as_ref().display()
         );
 
-        Ok(Self { fs })
+        Ok(Self { _fs: fs })
     }
 }
