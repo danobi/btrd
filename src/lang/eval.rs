@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::Write;
@@ -5,6 +6,7 @@ use std::io::Write;
 use anyhow::{anyhow, bail, ensure, Result};
 use nix::unistd::getcwd;
 
+use crate::btrfs::definitions::BTRFS_SEARCH_KEY;
 use crate::btrfs::fs::Fs;
 use crate::btrfs::structs::{Field as BtrfsField, Struct as BtrfsStruct, Type as BtrfsType};
 use crate::lang::ast::*;
@@ -187,6 +189,21 @@ impl Struct {
 
         Ok(ret)
     }
+
+    fn field(&mut self, name: &str) -> Result<&mut Value> {
+        let name_clone: &str = <&str>::clone(&self.name);
+
+        self.fields
+            .iter_mut()
+            .find_map(|f| {
+                if f.name == name {
+                    Some(&mut f.value)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| anyhow!("Failed to find field '{}' in 'struct {}'", name, name_clone))
+    }
 }
 
 fn indent(level: usize) -> String {
@@ -266,6 +283,13 @@ impl Value {
         match self {
             Value::Struct(s) => Ok(s),
             v => bail!("Expected struct, got '{}'", v.short_display()),
+        }
+    }
+
+    fn as_function(&self) -> Result<&Function> {
+        match self {
+            Value::Function(func) => Ok(func),
+            v => bail!("Expected function, got '{}'", v.short_display()),
         }
     }
 }
@@ -526,6 +550,43 @@ impl<'a> Eval<'a> {
         }
     }
 
+    fn eval_function(&self, func: &Expression, args: &[Expression]) -> Result<Value> {
+        match self.eval_expr(func)?.as_function()? {
+            k @ Function::Key => {
+                ensure!(args.len() == 4, "'{}()' requires 4 arguments", k);
+
+                // Evalulate args
+                let mut arg_vals = VecDeque::with_capacity(args.len());
+                for arg in args {
+                    let val = self.eval_expr(arg)?;
+                    // Will bail if non-integer
+                    let _ = val.as_integer()?;
+                    arg_vals.push_back(val);
+                }
+
+                let zeros = vec![0; BTRFS_SEARCH_KEY.size()];
+                let mut key = Struct::from_bytes(&*BTRFS_SEARCH_KEY, &zeros)?;
+
+                *(key.field("min_objectid")?) = arg_vals.pop_front().unwrap();
+                *(key.field("max_objectid")?) = Value::Integer(u64::MAX.into());
+
+                *(key.field("min_type")?) = arg_vals.pop_front().unwrap();
+                *(key.field("max_type")?) = Value::Integer(u8::MAX.into());
+
+                *(key.field("min_offset")?) = arg_vals.pop_front().unwrap();
+                *(key.field("max_offset")?) = Value::Integer(u64::MAX.into());
+
+                *(key.field("min_transid")?) = arg_vals.pop_front().unwrap();
+                *(key.field("max_transid")?) = Value::Integer(u64::MAX.into());
+
+                Ok(Value::Struct(key))
+            }
+            Function::Search => {
+                unimplemented!();
+            }
+        }
+    }
+
     fn eval_expr(&self, expr: &Expression) -> Result<Value> {
         match expr {
             Expression::PrimaryExpression(p) => self.eval_primary_expr(p),
@@ -537,10 +598,7 @@ impl<'a> Eval<'a> {
                 // TODO: implement after builtin functions are added
                 unimplemented!()
             }
-            Expression::FunctionCall(_expr, _args) => {
-                // TODO: implement when builtin functions are added
-                unimplemented!()
-            }
+            Expression::FunctionCall(func, args) => self.eval_function(func, args),
             Expression::BinaryExpression(b) => self.eval_binop_expr(b),
             Expression::UnaryExpression(u) => self.eval_unary_expr(u),
         }
