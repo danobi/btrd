@@ -190,7 +190,16 @@ impl Struct {
         Ok(ret)
     }
 
-    fn field(&mut self, name: &str) -> Result<&mut Value> {
+    fn field(&self, name: &str) -> Result<&Value> {
+        let name_clone: &str = <&str>::clone(&self.name);
+
+        self.fields
+            .iter()
+            .find_map(|f| if f.name == name { Some(&f.value) } else { None })
+            .ok_or_else(|| anyhow!("Failed to find field '{}' in 'struct {}'", name, name_clone))
+    }
+
+    fn field_mut(&mut self, name: &str) -> Result<&mut Value> {
         let name_clone: &str = <&str>::clone(&self.name);
 
         self.fields
@@ -567,17 +576,17 @@ impl<'a> Eval<'a> {
                 let zeros = vec![0; BTRFS_SEARCH_KEY.size()];
                 let mut key = Struct::from_bytes(&*BTRFS_SEARCH_KEY, &zeros)?;
 
-                *(key.field("min_objectid")?) = arg_vals.pop_front().unwrap();
-                *(key.field("max_objectid")?) = Value::Integer(u64::MAX.into());
+                *(key.field_mut("min_objectid")?) = arg_vals.pop_front().unwrap();
+                *(key.field_mut("max_objectid")?) = Value::Integer(u64::MAX.into());
 
-                *(key.field("min_type")?) = arg_vals.pop_front().unwrap();
-                *(key.field("max_type")?) = Value::Integer(u8::MAX.into());
+                *(key.field_mut("min_type")?) = arg_vals.pop_front().unwrap();
+                *(key.field_mut("max_type")?) = Value::Integer(u8::MAX.into());
 
-                *(key.field("min_offset")?) = arg_vals.pop_front().unwrap();
-                *(key.field("max_offset")?) = Value::Integer(u64::MAX.into());
+                *(key.field_mut("min_offset")?) = arg_vals.pop_front().unwrap();
+                *(key.field_mut("max_offset")?) = Value::Integer(u64::MAX.into());
 
-                *(key.field("min_transid")?) = arg_vals.pop_front().unwrap();
-                *(key.field("max_transid")?) = Value::Integer(u64::MAX.into());
+                *(key.field_mut("min_transid")?) = arg_vals.pop_front().unwrap();
+                *(key.field_mut("max_transid")?) = Value::Integer(u64::MAX.into());
 
                 Ok(Value::Struct(key))
             }
@@ -590,9 +599,18 @@ impl<'a> Eval<'a> {
     fn eval_expr(&self, expr: &Expression) -> Result<Value> {
         match expr {
             Expression::PrimaryExpression(p) => self.eval_primary_expr(p),
-            Expression::FieldAccess(_expr, _field) => {
-                // TODO: implement after builtin functions are added
-                unimplemented!()
+            Expression::FieldAccess(expr, field) => {
+                let expr = self.eval_expr(expr)?;
+                let s = expr.as_struct()?;
+
+                let ident = match &**field {
+                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(i))) => {
+                        i
+                    }
+                    _ => bail!("Field in a field access must be an identifier"),
+                };
+
+                Ok(s.field(ident)?.clone())
             }
             Expression::ArrayIndex(expr, index) => {
                 let arr = self.eval_expr(expr)?;
@@ -1336,6 +1354,58 @@ fn test_struct_deserialize() {
         assert_eq!(
             interpreted.fields[3].value.as_string().expect("not string"),
             "world12"
+        );
+    }
+}
+
+#[test]
+fn test_function_key() {
+    let tests = vec![
+        (
+            r#"k = key(0, 1, 2, 3); print k.min_objectid;"#,
+            "0\n".to_string(),
+        ),
+        (
+            r#"k = key(0, 1, 2, 3); print k.min_type;"#,
+            "1\n".to_string(),
+        ),
+        (
+            r#"k = key(0, 1, 2, 3); print k.min_offset;"#,
+            "2\n".to_string(),
+        ),
+        (
+            r#"k = key(0, 1, 2, 3); print k.min_transid;"#,
+            "3\n".to_string(),
+        ),
+        (
+            r#"k = key(0, 1, 2, 3); print k.max_objectid;"#,
+            format!("{}\n", u64::MAX),
+        ),
+        (
+            r#"k = key(0, 1, 2, 3); print k.max_type;"#,
+            format!("{}\n", u8::MAX),
+        ),
+        (
+            r#"k = key(0, 1, 2, 3); print k.max_offset;"#,
+            format!("{}\n", u64::MAX),
+        ),
+        (
+            r#"k = key(0, 1, 2, 3); print k.max_transid;"#,
+            format!("{}\n", u64::MAX),
+        ),
+    ];
+
+    use crate::lang::parse::parse;
+    for (input, expected) in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
+        match eval.eval(&parse(input).expect("Failed to parse")) {
+            EvalResult::Ok => (),
+            _ => assert!(false, "Failed to eval input"),
+        };
+        assert_eq!(
+            String::from_utf8(output).expect("Output not utf-8"),
+            expected
         );
     }
 }
