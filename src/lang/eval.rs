@@ -12,19 +12,19 @@ use crate::lang::functions::Function;
 use crate::lang::variables::Variables;
 
 #[derive(Clone, PartialEq)]
-pub struct StructField {
+struct StructField {
     name: &'static str,
     value: Value,
 }
 
 #[derive(Clone, PartialEq)]
-pub struct Struct {
+struct Struct {
     name: &'static str,
     fields: Vec<StructField>,
 }
 
 #[derive(Clone, PartialEq)]
-pub enum Value {
+enum Value {
     /// All integers are internally represented as 128 bit signed to keep things simple
     ///
     /// Any conversion errors (eg. during demotion, to unsigned) will trigger runtime errors
@@ -222,21 +222,21 @@ impl fmt::Display for Struct {
 }
 
 impl Value {
-    pub fn as_integer(&self) -> Result<i128> {
+    fn as_integer(&self) -> Result<i128> {
         match self {
             Value::Integer(i) => Ok(*i),
             _ => bail!("Value is not integer -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    pub fn as_boolean(&self) -> Result<bool> {
+    fn as_boolean(&self) -> Result<bool> {
         match self {
             Value::Boolean(b) => Ok(*b),
             _ => bail!("Value is not boolean -- semantic analysis bug (tell Daniel)"),
         }
     }
 
-    pub fn as_string(&self) -> Result<String> {
+    fn as_string(&self) -> Result<String> {
         match self {
             Value::String(s) => Ok(s.clone()),
             _ => bail!("Value is not string -- semantic analysis bug (tell Daniel)"),
@@ -514,14 +514,7 @@ impl<'a> Eval<'a> {
         }
     }
 
-    /// HACK: we make this method public so that semantic analysis can evaluate `search()` function
-    /// arguments. `search()` returns different struct types depending on the search arguments --
-    /// this doesn't play nice with the static type system. So as a hack, we'll expose this method
-    /// to allow semantic analysis to "look ahead" and figure out the return type.
-    ///
-    /// This ought to be OK b/c expression evaluation does not mutate program state -- it's
-    /// idempotent. This is reflected in the `&self` function signature.
-    pub fn eval_expr(&self, expr: &Expression) -> Result<Value> {
+    fn eval_expr(&self, expr: &Expression) -> Result<Value> {
         match expr {
             Expression::PrimaryExpression(p) => self.eval_primary_expr(p),
             Expression::FieldAccess(_expr, _field) => {
