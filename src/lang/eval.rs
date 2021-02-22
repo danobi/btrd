@@ -516,7 +516,7 @@ impl<'a> Eval<'a> {
                 match expr_val {
                     Value::Integer(i) => Ok(Value::Boolean(i == 0)),
                     Value::Boolean(b) => Ok(Value::Boolean(!b)),
-                    _ => bail!("Semantic analysis failure: UnaryNot on non-integer and non-boolean (tell Daniel)"),
+                    v => bail!("Expected integer or boolean, got '{}'", v.short_display()),
                 }
             }
             UnaryExpression::Minus(expr) => {
@@ -657,10 +657,7 @@ impl<'a> Eval<'a> {
 
                     InternalEvalResult::Ok
                 } else {
-                    InternalEvalResult::Err(
-                        "Semantic analysis failure: lhs of assignment isn't an ident (tell Daniel)"
-                            .to_string(),
-                    )
+                    InternalEvalResult::Err("Expected identifier on LHS of assignment".to_string())
                 }
             }
             Statement::BlockStatement(block) => match block {
@@ -772,47 +769,89 @@ impl<'a> Eval<'a> {
 
 #[test]
 fn test_expression() {
-    let tests = vec![
-        ("print ~8;", "-9\n"),
-        ("print -8;", "-8\n"),
-        ("print !8;", "false\n"),
-        ("print !0;", "true\n"),
-        ("print !!8;", "true\n"),
-        ("print 5 + 5;", "10\n"),
-        ("print 100 -3;", "97\n"),
-        ("print 100* 3;", "300\n"),
-        ("print 99 / 3;", "33\n"),
-        ("print 100 / 3;", "33\n"),
-        ("print 100 % 3;", "1\n"),
-        ("print 1 == 1;", "true\n"),
-        ("print true == false;", "false\n"),
-        ("print true != false;", "true\n"),
-        ("print true != false && 2 == 2;", "true\n"),
-        ("print true != false && 2 != 2;", "false\n"),
-        ("print true != false || 2 != 2;", "true\n"),
-        ("print 7 & 1;", "1\n"),
-        ("print 0 | 1 | 2;", "3\n"),
-        ("print 1 ^ 2;", "3\n"),
-        ("print 1 << 2;", "4\n"),
-        ("print 1 << 3;", "8\n"),
-        ("print 1 < 3;", "true\n"),
-        ("print 3 <= 3;", "true\n"),
-        ("print 3 > 3;", "false\n"),
-        ("print 3 >= 3;", "true\n"),
-    ];
+    {
+        let tests = vec![
+            ("print ~8;", "-9\n"),
+            ("print -8;", "-8\n"),
+            ("print !8;", "false\n"),
+            ("print !0;", "true\n"),
+            ("print !!8;", "true\n"),
+            ("print 5 + 5;", "10\n"),
+            ("print 100 -3;", "97\n"),
+            ("print 100* 3;", "300\n"),
+            ("print 99 / 3;", "33\n"),
+            ("print 100 / 3;", "33\n"),
+            ("print 100 % 3;", "1\n"),
+            ("print 1 == 1;", "true\n"),
+            ("print true == false;", "false\n"),
+            ("print true != false;", "true\n"),
+            ("print true != false && 2 == 2;", "true\n"),
+            ("print true != false && 2 != 2;", "false\n"),
+            ("print true != false || 2 != 2;", "true\n"),
+            ("print 7 & 1;", "1\n"),
+            ("print 0 | 1 | 2;", "3\n"),
+            ("print 1 ^ 2;", "3\n"),
+            ("print 1 << 2;", "4\n"),
+            ("print 1 << 3;", "8\n"),
+            ("print 1 < 3;", "true\n"),
+            ("print 3 <= 3;", "true\n"),
+            ("print 3 > 3;", "false\n"),
+            ("print 3 >= 3;", "true\n"),
+            ("print !1;", "false\n"),
+            ("print !!1;", "true\n"),
+            ("print !!!!!5;", "false\n"),
+            ("print ~1;", "-2\n"),
+            ("print -~~~5;", "6\n"),
+            ("print --5;", "5\n"),
+        ];
 
-    use crate::lang::parse::parse;
-    for (input, expected) in tests {
-        let mut output = Vec::new();
-        let mut eval = Eval::new(&mut output, false);
-        match eval.eval(&parse(input).expect("Failed to parse")) {
-            EvalResult::Ok => (),
-            _ => assert!(false),
-        };
-        assert_eq!(
-            String::from_utf8(output).expect("Output not utf-8"),
-            expected
-        );
+        use crate::lang::parse::parse;
+        for (input, expected) in tests {
+            let mut output = Vec::new();
+            let mut eval = Eval::new(&mut output, false);
+            match eval.eval(&parse(input).expect("Failed to parse")) {
+                EvalResult::Ok => (),
+                _ => assert!(false),
+            };
+            assert_eq!(
+                String::from_utf8(output).expect("Output not utf-8"),
+                expected
+            );
+        }
+    }
+    {
+        let tests = vec![
+            (r#"!"str";"#),
+            (r#"~"asdf";"#),
+            ("~true;"),
+            (r#"-"str";"#),
+            ("-true;"),
+            ("true + 3;"),
+            (r#""string" * false;"#),
+            (r#""string" / 1234;"#),
+            (r#""string" % 1234;"#),
+            ("false && 3;"),
+            ("false || 3;"),
+            ("false | 3;"),
+            ("3 & true;"),
+            ("3 ^ true;"),
+            (r#"1 << "asdf";"#),
+            ("true >> 3;"),
+            (r#"1 < "str";"#),
+            (r#"1 > "str";"#),
+            (r#"1 >= "str";"#),
+            (r#"1 <= "str";"#),
+        ];
+
+        use crate::lang::parse::parse;
+        for input in tests {
+            let mut output = Vec::new();
+            let mut eval = Eval::new(&mut output, false);
+            match eval.eval(&parse(input).expect("Failed to parse")) {
+                EvalResult::Err(_) => (),
+                _ => assert!(false, "Eval succeeded when should have failed"),
+            };
+        }
     }
 }
 

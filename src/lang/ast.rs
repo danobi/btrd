@@ -50,31 +50,6 @@ pub enum BinaryExpression {
     GreaterThanEquals(Box<Expression>, Box<Expression>),
 }
 
-impl BinaryExpression {
-    pub fn op_str(&self) -> &str {
-        match self {
-            BinaryExpression::Plus(_, _) => "+",
-            BinaryExpression::Minus(_, _) => "-",
-            BinaryExpression::Multiply(_, _) => "*",
-            BinaryExpression::Divide(_, _) => "/",
-            BinaryExpression::Modulo(_, _) => "%",
-            BinaryExpression::Equals(_, _) => "==",
-            BinaryExpression::NotEquals(_, _) => "!=",
-            BinaryExpression::LogicalAnd(_, _) => "&&",
-            BinaryExpression::LogicalOr(_, _) => "||",
-            BinaryExpression::BitOr(_, _) => "|",
-            BinaryExpression::BitAnd(_, _) => "&",
-            BinaryExpression::BitXor(_, _) => "^",
-            BinaryExpression::LeftShift(_, _) => "<<",
-            BinaryExpression::RightShift(_, _) => ">>",
-            BinaryExpression::LessThan(_, _) => "<",
-            BinaryExpression::LessThanEquals(_, _) => "<=",
-            BinaryExpression::GreaterThan(_, _) => ">",
-            BinaryExpression::GreaterThanEquals(_, _) => ">=",
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Constant {
     Integer(i128),
