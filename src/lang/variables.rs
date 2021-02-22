@@ -42,8 +42,8 @@ impl<T> Variables<T> {
 
     pub fn get(&self, ident: &Identifier) -> Option<&T> {
         for scope in self.inner.iter().rev() {
-            if let Some(ty) = scope.get(ident) {
-                return Some(ty);
+            if let Some(v) = scope.get(ident) {
+                return Some(v);
             }
         }
 
@@ -51,6 +51,13 @@ impl<T> Variables<T> {
     }
 
     pub fn insert(&mut self, ident: Identifier, val: T) {
+        for scope in self.inner.iter_mut().rev() {
+            if let Some(v) = scope.get_mut(&ident) {
+                *v = val;
+                return;
+            }
+        }
+
         assert!(!self.inner.is_empty());
         self.inner.last_mut().unwrap().insert(ident, val);
     }

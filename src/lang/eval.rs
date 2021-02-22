@@ -569,6 +569,78 @@ impl<'a> Eval<'a> {
         }
     }
 
+    fn eval_if(
+        &mut self,
+        cond: &Expression,
+        true_body: &[Statement],
+        false_body: &[Statement],
+    ) -> InternalEvalResult {
+        let cond = match self.eval_expr(cond) {
+            Ok(c) => match c.as_boolean() {
+                Ok(v) => v,
+                Err(e) => return InternalEvalResult::Err(e.to_string()),
+            },
+            Err(e) => return InternalEvalResult::Err(e.to_string()),
+        };
+
+        let stmts = if cond { true_body } else { false_body };
+        for stmt in stmts {
+            match self.eval_statement(stmt) {
+                InternalEvalResult::Ok => (),
+                r @ InternalEvalResult::Err(_)
+                | r @ InternalEvalResult::Quit
+                | r @ InternalEvalResult::Break
+                | r @ InternalEvalResult::Continue => return r,
+            };
+        }
+
+        InternalEvalResult::Ok
+    }
+
+    fn eval_while(&mut self, cond: &Expression, stmts: &[Statement]) -> InternalEvalResult {
+        let mut break_loop = false;
+        loop {
+            let cond = match self.eval_expr(cond) {
+                Ok(c) => match c.as_boolean() {
+                    Ok(v) => v,
+                    Err(e) => return InternalEvalResult::Err(e.to_string()),
+                },
+                Err(e) => return InternalEvalResult::Err(e.to_string()),
+            };
+
+            if !cond {
+                break;
+            }
+
+            for stmt in stmts {
+                match self.eval_statement(stmt) {
+                    InternalEvalResult::Ok => (),
+                    InternalEvalResult::Break => {
+                        break_loop = true;
+                        break;
+                    }
+                    InternalEvalResult::Continue => break,
+                    r @ InternalEvalResult::Err(_) | r @ InternalEvalResult::Quit => return r,
+                };
+            }
+
+            if break_loop {
+                break;
+            }
+        }
+
+        InternalEvalResult::Ok
+    }
+
+    fn eval_for(
+        &mut self,
+        _ident: &Expression,
+        _range: &Expression,
+        _stmts: &[Statement],
+    ) -> InternalEvalResult {
+        unimplemented!();
+    }
+
     fn eval_statement(&mut self, stmt: &Statement) -> InternalEvalResult {
         match stmt {
             Statement::AssignStatement(lhs, rhs) => {
@@ -588,65 +660,25 @@ impl<'a> Eval<'a> {
             }
             Statement::BlockStatement(block) => match block {
                 BlockStatement::If(cond, true_body, false_body) => {
-                    let cond = match self.eval_expr(cond) {
-                        Ok(c) => match c.as_boolean() {
-                            Ok(v) => v,
-                            Err(e) => return InternalEvalResult::Err(e.to_string()),
-                        },
-                        Err(e) => return InternalEvalResult::Err(e.to_string()),
-                    };
+                    self.variables.push_scope();
+                    let ret = self.eval_if(cond, true_body, false_body);
+                    self.variables.pop_scope();
 
-                    let stmts = if cond { true_body } else { false_body };
-                    for stmt in stmts {
-                        match self.eval_statement(stmt) {
-                            InternalEvalResult::Ok => (),
-                            r @ InternalEvalResult::Err(_)
-                            | r @ InternalEvalResult::Quit
-                            | r @ InternalEvalResult::Break
-                            | r @ InternalEvalResult::Continue => return r,
-                        };
-                    }
-
-                    InternalEvalResult::Ok
+                    ret
                 }
                 BlockStatement::While(cond, stmts) => {
-                    let mut break_loop = false;
-                    loop {
-                        let cond = match self.eval_expr(cond) {
-                            Ok(c) => match c.as_boolean() {
-                                Ok(v) => v,
-                                Err(e) => return InternalEvalResult::Err(e.to_string()),
-                            },
-                            Err(e) => return InternalEvalResult::Err(e.to_string()),
-                        };
+                    self.variables.push_scope();
+                    let ret = self.eval_while(cond, stmts);
+                    self.variables.pop_scope();
 
-                        if !cond {
-                            break;
-                        }
-
-                        for stmt in stmts {
-                            match self.eval_statement(stmt) {
-                                InternalEvalResult::Ok => (),
-                                InternalEvalResult::Break => {
-                                    break_loop = true;
-                                    break;
-                                }
-                                InternalEvalResult::Continue => break,
-                                r @ InternalEvalResult::Err(_) | r @ InternalEvalResult::Quit => {
-                                    return r
-                                }
-                            };
-                        }
-
-                        if break_loop {
-                            break;
-                        }
-                    }
-
-                    InternalEvalResult::Ok
+                    ret
                 }
-                BlockStatement::For(_ident, _range, _stmts) => {
-                    unimplemented!();
+                BlockStatement::For(ident, range, stmts) => {
+                    self.variables.push_scope();
+                    let ret = self.eval_for(ident, range, stmts);
+                    self.variables.pop_scope();
+
+                    ret
                 }
             },
             Statement::JumpStatement(jump) => match jump {
@@ -784,11 +816,11 @@ fn test_if() {
     let tests = vec![
         (r#"x = 3; if x == 3 { print "yep"; }"#, "\"yep\"\n"),
         (
-            r#"x = 3; if x != 3 { print "yep"; } else { print "yep"; }"#,
+            r#"x = 3; if x != 3 { print "nope"; } else { print "yep"; }"#,
             "\"yep\"\n",
         ),
         (
-            r#"x = 3; if x != 3 { print "yep"; } else { print "yep"; if x == 3 { x = 4; } } print x;"#,
+            r#"x = 3; if x != 3 { print "nope"; } else { print "yep"; if x == 3 { x = 4; } } print x;"#,
             "\"yep\"\n4\n",
         ),
     ];
