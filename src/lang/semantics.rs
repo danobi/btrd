@@ -78,7 +78,6 @@ impl SemanticAnalyzer {
             Expression::FieldAccess(expr, field) => {
                 match &**field {
                     Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(_))) => {
-                        ()
                     }
                     _ => bail!("Field in a field access must be an identifier"),
                 };
