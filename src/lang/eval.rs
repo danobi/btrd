@@ -594,9 +594,16 @@ impl<'a> Eval<'a> {
                 // TODO: implement after builtin functions are added
                 unimplemented!()
             }
-            Expression::ArrayIndex(_expr, _index) => {
-                // TODO: implement after builtin functions are added
-                unimplemented!()
+            Expression::ArrayIndex(expr, index) => {
+                let arr = self.eval_expr(expr)?;
+                let vec = arr.as_vec()?;
+                let idx = self.eval_expr(index)?.as_integer()?;
+
+                if let Some(v) = vec.get::<usize>(idx.try_into()?) {
+                    Ok(v.clone())
+                } else {
+                    bail!("Index {} out of range, length is {}", idx, vec.len());
+                }
             }
             Expression::FunctionCall(func, args) => self.eval_function(func, args),
             Expression::BinaryExpression(b) => self.eval_binop_expr(b),
@@ -1332,3 +1339,5 @@ fn test_struct_deserialize() {
         );
     }
 }
+
+// TODO: test array indexing
