@@ -222,38 +222,50 @@ impl fmt::Display for Struct {
 }
 
 impl Value {
+    fn short_display(&self) -> String {
+        match self {
+            Value::Array(vec) => format!(
+                "[{}][{}]",
+                vec.get(0).map_or("?".into(), |v| v.short_display()),
+                vec.len()
+            ),
+            Value::Struct(s) => format!("struct {}", s.name),
+            v => format!("{}", v),
+        }
+    }
+
     fn as_integer(&self) -> Result<i128> {
         match self {
             Value::Integer(i) => Ok(*i),
-            _ => bail!("Value is not integer -- semantic analysis bug (tell Daniel)"),
+            v => bail!("Expected integer, got '{}'", v.short_display()),
         }
     }
 
     fn as_boolean(&self) -> Result<bool> {
         match self {
             Value::Boolean(b) => Ok(*b),
-            _ => bail!("Value is not boolean -- semantic analysis bug (tell Daniel)"),
+            v => bail!("Expected boolean, got '{}'", v.short_display()),
         }
     }
 
-    fn as_string(&self) -> Result<String> {
+    fn as_string(&self) -> Result<&str> {
         match self {
-            Value::String(s) => Ok(s.clone()),
-            _ => bail!("Value is not string -- semantic analysis bug (tell Daniel)"),
+            Value::String(s) => Ok(s),
+            v => bail!("Expected string, got '{}'", v.short_display()),
         }
     }
 
-    fn as_vec(&self) -> Result<Vec<Value>> {
+    fn as_vec(&self) -> Result<&[Value]> {
         match self {
-            Value::Array(v) => Ok(v.clone()),
-            _ => bail!("Value is not array -- semantic analysis bug (tell Daniel)"),
+            Value::Array(v) => Ok(v),
+            v => bail!("Expected array, got '{}'", v.short_display()),
         }
     }
 
-    fn as_struct(&self) -> Result<Struct> {
+    fn as_struct(&self) -> Result<&Struct> {
         match self {
-            Value::Struct(s) => Ok(s.clone()),
-            _ => bail!("Value is not struct -- semantic analysis bug (tell Daniel)"),
+            Value::Struct(s) => Ok(s),
+            v => bail!("Expected struct, got '{}'", v.short_display()),
         }
     }
 }
