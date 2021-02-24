@@ -6,7 +6,7 @@ use std::io::Write;
 use anyhow::{anyhow, bail, ensure, Result};
 use nix::unistd::getcwd;
 
-use crate::btrfs::definitions::BTRFS_SEARCH_KEY;
+use crate::btrfs::definitions::{BTRFS_SEARCH_KEY, STRUCTS};
 use crate::btrfs::fs::Fs;
 use crate::btrfs::structs::{Field as BtrfsField, Struct as BtrfsStruct, Type as BtrfsType};
 use crate::lang::ast::*;
@@ -367,7 +367,7 @@ pub struct Eval<'a> {
     sink: &'a mut dyn Write,
     interactive: bool,
     variables: Variables<Value>,
-    _fs: Option<Fs>,
+    fs: Option<Fs>,
 }
 
 impl<'a> Eval<'a> {
@@ -564,7 +564,7 @@ impl<'a> Eval<'a> {
             k @ Function::Key => {
                 ensure!(args.len() == 4, "'{}()' requires 4 arguments", k);
 
-                // Evalulate args
+                // Evaluate args
                 let mut arg_vals = VecDeque::with_capacity(args.len());
                 for arg in args {
                     let val = self.eval_expr(arg)?;
@@ -590,8 +590,63 @@ impl<'a> Eval<'a> {
 
                 Ok(Value::Struct(key))
             }
-            Function::Search => {
-                unimplemented!();
+            s @ Function::Search => {
+                ensure!(args.len() == 2, "'{}()' requires 2 arguments", s);
+
+                let tree_id = self.eval_expr(&args[0])?.as_integer()?;
+                let key_val = self.eval_expr(&args[1])?;
+                let key = key_val.as_struct()?;
+                ensure!(
+                    key.name == BTRFS_SEARCH_KEY.name,
+                    "Argument 2 of search() must be 'struct {}",
+                    BTRFS_SEARCH_KEY.name
+                );
+
+                let chunks = match &self.fs {
+                    Some(fs) => fs.search(
+                        tree_id.try_into()?,
+                        key.field("min_objectid")?.as_integer()?.try_into()?,
+                        key.field("max_objectid")?.as_integer()?.try_into()?,
+                        key.field("min_type")?.as_integer()?.try_into()?,
+                        key.field("max_type")?.as_integer()?.try_into()?,
+                        key.field("min_offset")?.as_integer()?.try_into()?,
+                        key.field("max_offset")?.as_integer()?.try_into()?,
+                        key.field("min_transid")?.as_integer()?.try_into()?,
+                        key.field("max_transid")?.as_integer()?.try_into()?,
+                    )?,
+                    None => bail!(
+                        "No filesystem set, set a filesystem first with 'filesystem \"/path\"'"
+                    ),
+                };
+
+                let mut arr = Vec::new();
+                for (header, bytes) in chunks {
+                    let s = STRUCTS
+                        .iter()
+                        .find_map(|s| {
+                            if (s.key_match)(
+                                header.objectid.into(),
+                                header.ty.into(),
+                                header.offset.into(),
+                            ) {
+                                return Some(s);
+                            }
+
+                            None
+                        })
+                        .ok_or_else(|| {
+                            anyhow!(
+                                "Failed to a matching on-disk struct to key ({}, {}, {})",
+                                header.objectid,
+                                header.ty,
+                                header.offset
+                            )
+                        })?;
+
+                    arr.push(Value::Struct(Struct::from_bytes(s, &bytes)?));
+                }
+
+                Ok(Value::Array(arr))
             }
         }
     }
@@ -634,7 +689,7 @@ impl<'a> Eval<'a> {
             BuiltinStatement::Help => self.print_help(),
             BuiltinStatement::Quit => InternalEvalResult::Quit,
             BuiltinStatement::Filesystem(fs) => {
-                self._fs = match self.eval_expr(fs) {
+                self.fs = match self.eval_expr(fs) {
                     Ok(val) => match val.as_string() {
                         Ok(path) => match Fs::new(path) {
                             Ok(fs) => Some(fs),
@@ -919,7 +974,7 @@ impl<'a> Eval<'a> {
             sink,
             interactive,
             variables: Variables::new(Value::Integer, Value::Function),
-            _fs: fs,
+            fs,
         }
     }
 
