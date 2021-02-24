@@ -1142,6 +1142,29 @@ lazy_static! {
             ],
         },
         Struct {
+            name: "btrfs_free_space_header",
+            key_match: |oid, ty, _| oid == BTRFS_FREE_SPACE_OBJECTID.into() && ty == 0,
+            fields: vec![
+                Field {
+                    name: Some("location"),
+                    ty: Type::Struct(BTRFS_KEY.clone()),
+                },
+                Field {
+                    name: Some("generation"),
+                    ty: Type::U64,
+                },
+                Field {
+                    name: Some("num_entries"),
+                    ty: Type::U64,
+                },
+                Field {
+                    name: Some("num_bitmaps"),
+                    ty: Type::U64,
+                },
+                // TODO: Handle trailing free space entries
+            ],
+        },
+        Struct {
             name: "btrfs_qgroup_status_item",
             key_match: |oid, ty, off| oid == 0 && ty == BTRFS_QGROUP_STATUS_KEY && off == 0,
             fields: vec![
