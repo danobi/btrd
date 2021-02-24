@@ -722,11 +722,51 @@ impl<'a> Eval<'a> {
 
     fn eval_for(
         &mut self,
-        _ident: &Expression,
-        _range: &Expression,
-        _stmts: &[Statement],
+        ident: &Expression,
+        range: &Expression,
+        stmts: &[Statement],
     ) -> InternalEvalResult {
-        unimplemented!();
+        let ident = match ident {
+            Expression::PrimaryExpression(PrimaryExpression::Identifier(i)) => i,
+            _ => {
+                return InternalEvalResult::Err(
+                    "Variable in for loop must be an identifier".to_string(),
+                )
+            }
+        };
+
+        let range = match self.eval_expr(range) {
+            Ok(r) => r,
+            Err(e) => return InternalEvalResult::Err(e.to_string()),
+        };
+
+        let range_vec = match range.as_vec() {
+            Ok(r) => r,
+            Err(e) => return InternalEvalResult::Err(e.to_string()),
+        };
+
+        let mut break_loop = false;
+        for item in range_vec {
+            self.variables.insert(ident.clone(), item.clone());
+
+            for stmt in stmts {
+                match self.eval_statement(stmt) {
+                    InternalEvalResult::Ok => (),
+                    InternalEvalResult::Break => {
+                        break_loop = true;
+                        break;
+                    }
+                    InternalEvalResult::Continue => break,
+                    r @ InternalEvalResult::Err(_) | r @ InternalEvalResult::Quit => return r,
+                };
+            }
+
+            if break_loop {
+                break;
+            }
+        }
+
+        InternalEvalResult::Ok
     }
 
     /// Evaluates where the left hand side of an assignment should write to
@@ -1472,3 +1512,5 @@ fn test_function_key() {
 }
 
 // TODO: test array indexing
+
+// TODO: test range based for loop
