@@ -5,7 +5,7 @@ digraph F {
         label = "btrfs";
         labeljust = "l";
         style = dotted;
-        definitions;
+        definitions -> structs;
         fs;
     }
     
@@ -14,8 +14,7 @@ digraph F {
         labeljust = "l";
         style = dotted;
         variables -> definitions;
-        structs -> definitions;
-        functions -> fs;
+        structs;
     }
     
     subgraph cluster_2 {
@@ -23,11 +22,19 @@ digraph F {
         labeljust = "l";
         style = dotted;
         semantics -> variables;
-        semantics -> structs;
-        semantics -> functions;
+        eval -> definitions;
+        eval -> fs;
         eval -> variables;
         eval -> structs;
-        eval -> functions;
-        eval -> fs;
+        parse;
+    }
+
+    subgraph cluster_3 {
+        label = "lang";
+        labeljust = "l";
+        style = dotted;
+        runtime -> parse;
+        runtime -> semantics;
+        runtime -> eval;
     }
 }

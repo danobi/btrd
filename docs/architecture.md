@@ -10,10 +10,9 @@
 ### Modules
 
 * `lang/functions.rs`
-* `lang/structs.rs`
 * `lang/variables.rs`
 
-Manages functions, structs, and variable lifetimes.
+Manages functions and variable lifetimes.
 
 * `lang/ast.rs`
 * `lang/eval.rs`
@@ -23,6 +22,7 @@ Manages functions, structs, and variable lifetimes.
 Generic language modules. Abstract syntax tree data structure, runtime
 evaluation, AST parsing, and semantic analysis.
 
+* `btrfs/structs.rs`
 * `btrfs/defintions.rs`
 * `btrfs/fs.rs`
 
