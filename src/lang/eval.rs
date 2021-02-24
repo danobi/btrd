@@ -250,11 +250,7 @@ impl fmt::Display for Struct {
 impl Value {
     fn short_display(&self) -> String {
         match self {
-            Value::Array(vec) => format!(
-                "[{}][{}]",
-                vec.get(0).map_or("?".into(), |v| v.short_display()),
-                vec.len()
-            ),
+            Value::Array(vec) => format!("[][{}]", vec.len()),
             Value::Struct(s) => format!("struct {}", s.name),
             v => format!("{}", v),
         }
