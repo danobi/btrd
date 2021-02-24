@@ -1236,7 +1236,7 @@ fn test_struct_deserialize() {
             four: 4,
         };
 
-        let interpreted = Struct::from_bytes(&struct_def, unsafe { any_as_u8_slice(&s) })
+        let interpreted = Struct::from_bytes(&struct_def, None, unsafe { any_as_u8_slice(&s) })
             .expect("Failed to interpret struct");
 
         assert_eq!(interpreted.name, "some_struct");
@@ -1289,7 +1289,7 @@ fn test_struct_deserialize() {
             two: 11111,
         };
 
-        let interpreted = Struct::from_bytes(&struct_def, unsafe { any_as_u8_slice(&s) })
+        let interpreted = Struct::from_bytes(&struct_def, None, unsafe { any_as_u8_slice(&s) })
             .expect("Failed to interpret struct");
 
         assert_eq!(interpreted.name, "some_struct");
@@ -1361,7 +1361,7 @@ fn test_struct_deserialize() {
             inner: InnerStruct { three: 3 },
         };
 
-        let interpreted = Struct::from_bytes(&struct_def, unsafe { any_as_u8_slice(&s) })
+        let interpreted = Struct::from_bytes(&struct_def, None, unsafe { any_as_u8_slice(&s) })
             .expect("Failed to interpret struct");
 
         assert_eq!(interpreted.name, "some_struct");
@@ -1450,7 +1450,7 @@ fn test_struct_deserialize() {
             },
         };
 
-        let interpreted = Struct::from_bytes(&struct_def, unsafe { any_as_u8_slice(&s) })
+        let interpreted = Struct::from_bytes(&struct_def, None, unsafe { any_as_u8_slice(&s) })
             .expect("Failed to interpret struct");
 
         assert_eq!(interpreted.name, "some_struct");
@@ -1515,7 +1515,7 @@ fn test_struct_deserialize() {
         bytes.extend_from_slice(&"world12".to_string().as_bytes());
 
         let interpreted =
-            Struct::from_bytes(&struct_def, &bytes).expect("Failed to interpret struct");
+            Struct::from_bytes(&struct_def, None, &bytes).expect("Failed to interpret struct");
 
         assert_eq!(interpreted.name, "some_struct");
         assert_eq!(interpreted.fields.len(), 4);
