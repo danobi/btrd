@@ -690,6 +690,12 @@ impl<'a> Eval<'a> {
                     bail!("Could not take '{}()' struct with no on-disk key", k);
                 }
             }
+            l @ Function::Len => {
+                ensure!(args.len() == 1, "'{}()' requires 1 argument", l);
+                let expr = self.eval_expr(&args[0])?;
+
+                Ok(Value::Integer(expr.as_vec()?.len().try_into()?))
+            }
         }
     }
 
@@ -1629,3 +1635,5 @@ fn test_function_typeof() {
 // TODO: test array indexing
 
 // TODO: test range based for loop
+
+// TODO: test len()
