@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use anyhow::{bail, Result};
 use log::{error, info};
 use rustyline::error::ReadlineError;
@@ -70,16 +72,12 @@ fn welcome() {
     println!();
 }
 
-fn main() -> Result<()> {
-    let opts = Opt::from_args();
-    init_logging(opts.debug)?;
-
+fn repl(sink: &mut dyn Write) -> Result<()> {
     let mut editor = init_editor();
     init_history(&mut editor);
     welcome();
 
-    let mut stdout = std::io::stdout();
-    let mut runtime = Runtime::new(&mut stdout, true);
+    let mut runtime = Runtime::new(sink, true);
 
     loop {
         match editor.readline(PROMPT) {
@@ -113,6 +111,16 @@ fn main() -> Result<()> {
     }
 
     save_history(&mut editor)?;
+
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let opts = Opt::from_args();
+    init_logging(opts.debug)?;
+
+    let mut stdout = std::io::stdout();
+    repl(&mut stdout)?;
 
     Ok(())
 }
