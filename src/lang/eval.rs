@@ -729,19 +729,76 @@ impl<'a> Eval<'a> {
         unimplemented!();
     }
 
+    /// Evaluates where the left hand side of an assignment should write to
+    fn eval_lhs_assign(&mut self, expr: &Expression) -> Result<&mut Value> {
+        match expr {
+            Expression::PrimaryExpression(pe) => match pe {
+                PrimaryExpression::Identifier(ident) => Ok(self
+                    .variables
+                    .get_mut(ident)
+                    .ok_or_else(|| anyhow!("Unknown variable: {}", ident))?),
+                _ => bail!("Expected identifier in LHS of assignment"),
+            },
+            Expression::FieldAccess(expr, field) => {
+                let ident = match &**field {
+                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(i))) => {
+                        i
+                    }
+                    _ => bail!("Field in a field access must be an identifier"),
+                };
+
+                match self.eval_lhs_assign(expr)? {
+                    Value::Struct(s) => Ok(s.field_mut(ident)?),
+                    _ => bail!("Field access must be used on a struct"),
+                }
+            }
+            Expression::ArrayIndex(expr, index) => {
+                let idx = self.eval_expr(index)?.as_integer()?;
+                let lhs = self.eval_lhs_assign(expr)?;
+
+                match lhs {
+                    Value::Array(v) => {
+                        let len = v.len();
+                        Ok(v.get_mut::<usize>(idx.try_into()?).ok_or_else(|| {
+                            anyhow!("Index {} out of range, length is {}", idx, len)
+                        })?)
+                    }
+                    _ => bail!("Array index must be used on an array"),
+                }
+            }
+            Expression::FunctionCall(_, _) => {
+                bail!("Unexpected function call in LHS of assignment")
+            }
+            Expression::BinaryExpression(_) => {
+                bail!("Unexpected binary expression in LHS of assignment")
+            }
+            Expression::UnaryExpression(_) => {
+                bail!("Unexpected unary expression in LHS of assignment")
+            }
+        }
+    }
+
     fn eval_statement(&mut self, stmt: &Statement) -> InternalEvalResult {
         match stmt {
             Statement::AssignStatement(lhs, rhs) => {
-                if let Expression::PrimaryExpression(PrimaryExpression::Identifier(ident)) = lhs {
-                    match self.eval_expr(rhs) {
-                        Ok(v) => self.variables.insert(ident.clone(), v),
-                        Err(e) => return InternalEvalResult::Err(e.to_string()),
-                    };
+                let rhs_val = match self.eval_expr(rhs) {
+                    Ok(v) => v,
+                    Err(e) => return InternalEvalResult::Err(e.to_string()),
+                };
 
-                    InternalEvalResult::Ok
-                } else {
-                    InternalEvalResult::Err("Expected identifier on LHS of assignment".to_string())
+                // Handle whole variable assignment (eg `x = 3`)
+                if let Expression::PrimaryExpression(PrimaryExpression::Identifier(ident)) = lhs {
+                    self.variables.insert(ident.clone(), rhs_val);
+                    return InternalEvalResult::Ok;
                 }
+
+                // Handle partial variable assignment (eg `x.foo = 3`)
+                match self.eval_lhs_assign(lhs) {
+                    Ok(r) => *r = rhs_val,
+                    Err(e) => return InternalEvalResult::Err(e.to_string()),
+                };
+
+                InternalEvalResult::Ok
             }
             Statement::BlockStatement(block) => match block {
                 BlockStatement::If(cond, true_body, false_body) => {
@@ -1392,6 +1449,10 @@ fn test_function_key() {
         (
             r#"k = key(0, 1, 2, 3); print k.max_transid;"#,
             format!("{}\n", u64::MAX),
+        ),
+        (
+            r#"k = key(0, 1, 2, 3); k.min_type = 33; print k.min_type;"#,
+            format!("{}\n", 33),
         ),
     ];
 

@@ -50,6 +50,16 @@ impl<T> Variables<T> {
         None
     }
 
+    pub fn get_mut(&mut self, ident: &Identifier) -> Option<&mut T> {
+        for scope in self.inner.iter_mut().rev() {
+            if let Some(v) = scope.get_mut(ident) {
+                return Some(v);
+            }
+        }
+
+        None
+    }
+
     pub fn insert(&mut self, ident: Identifier, val: T) {
         for scope in self.inner.iter_mut().rev() {
             if let Some(v) = scope.get_mut(&ident) {
