@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 pub enum Function {
     Key,
     Search,
-    Type,
+    TypeOf,
 }
 
 impl fmt::Display for Function {
@@ -14,11 +14,11 @@ impl fmt::Display for Function {
         match self {
             Function::Key => write!(f, "key"),
             Function::Search => write!(f, "search"),
-            Function::Type => write!(f, "type"),
+            Function::TypeOf => write!(f, "typeof"),
         }
     }
 }
 
 lazy_static! {
-    pub static ref FUNCTIONS: Vec<Function> = vec![Function::Key, Function::Search, Function::Type];
+    pub static ref FUNCTIONS: Vec<Function> = vec![Function::Key, Function::Search, Function::TypeOf];
 }

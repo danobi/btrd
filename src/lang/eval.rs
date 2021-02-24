@@ -640,7 +640,7 @@ impl<'a> Eval<'a> {
 
                 Ok(Value::Array(arr))
             }
-            t @ Function::Type => {
+            t @ Function::TypeOf => {
                 ensure!(args.len() == 1, "'{}()' requires 1 argument", t);
 
                 let expr = self.eval_expr(&args[0])?;
@@ -1562,15 +1562,15 @@ fn test_function_key() {
 }
 
 #[test]
-fn test_function_type() {
+fn test_function_typeof() {
     let tests = vec![
         (
-            r#"k = key(0, 1, 2, 3); print type(k);"#,
+            r#"k = key(0, 1, 2, 3); print typeof(k);"#,
             "\"struct _btrfs_ioctl_search_key\"\n".to_string(),
         ),
-        (r#"k = 1; print type(k);"#, "\"integer\"\n".to_string()),
-        (r#"k = false; print type(k);"#, "\"boolean\"\n".to_string()),
-        (r#"k = "str"; print type(k);"#, "\"string\"\n".to_string()),
+        (r#"k = 1; print typeof(k);"#, "\"integer\"\n".to_string()),
+        (r#"k = false; print typeof(k);"#, "\"boolean\"\n".to_string()),
+        (r#"k = "str"; print typeof(k);"#, "\"string\"\n".to_string()),
     ];
 
     use crate::lang::parse::parse;
