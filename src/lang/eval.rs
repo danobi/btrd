@@ -686,8 +686,7 @@ impl<'a> Eval<'a> {
     }
 
     fn eval_while(&mut self, cond: &Expression, stmts: &[Statement]) -> InternalEvalResult {
-        let mut break_loop = false;
-        loop {
+        'outer: loop {
             let cond = match self.eval_expr(cond) {
                 Ok(c) => match c.as_boolean() {
                     Ok(v) => v,
@@ -704,16 +703,11 @@ impl<'a> Eval<'a> {
                 match self.eval_statement(stmt) {
                     InternalEvalResult::Ok => (),
                     InternalEvalResult::Break => {
-                        break_loop = true;
-                        break;
+                        break 'outer;
                     }
                     InternalEvalResult::Continue => break,
                     r @ InternalEvalResult::Err(_) | r @ InternalEvalResult::Quit => return r,
                 };
-            }
-
-            if break_loop {
-                break;
             }
         }
 
@@ -745,24 +739,18 @@ impl<'a> Eval<'a> {
             Err(e) => return InternalEvalResult::Err(e.to_string()),
         };
 
-        let mut break_loop = false;
-        for item in range_vec {
+        'outer: for item in range_vec {
             self.variables.insert(ident.clone(), item.clone());
 
             for stmt in stmts {
                 match self.eval_statement(stmt) {
                     InternalEvalResult::Ok => (),
                     InternalEvalResult::Break => {
-                        break_loop = true;
-                        break;
+                        break 'outer;
                     }
                     InternalEvalResult::Continue => break,
                     r @ InternalEvalResult::Err(_) | r @ InternalEvalResult::Quit => return r,
                 };
-            }
-
-            if break_loop {
-                break;
             }
         }
 
