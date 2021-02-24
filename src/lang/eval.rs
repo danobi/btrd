@@ -621,29 +621,25 @@ impl<'a> Eval<'a> {
 
                 let mut arr = Vec::new();
                 for (header, bytes) in chunks {
-                    let s = STRUCTS
-                        .iter()
-                        .find_map(|s| {
-                            if (s.key_match)(
-                                header.objectid.into(),
-                                header.ty.into(),
-                                header.offset.into(),
-                            ) {
-                                return Some(s);
-                            }
+                    let s = STRUCTS.iter().find_map(|s| {
+                        if (s.key_match)(
+                            header.objectid.into(),
+                            header.ty.into(),
+                            header.offset.into(),
+                        ) {
+                            return Some(s);
+                        }
 
-                            None
-                        })
-                        .ok_or_else(|| {
-                            anyhow!(
-                                "Failed to a matching on-disk struct to key ({}, {}, {})",
-                                header.objectid,
-                                header.ty,
-                                header.offset
-                            )
-                        })?;
+                        None
+                    });
 
-                    arr.push(Value::Struct(Struct::from_bytes(s, &bytes)?));
+                    match s {
+                        Some(s) => arr.push(Value::Struct(Struct::from_bytes(s, &bytes)?)),
+                        None => eprintln!(
+                            "Warning: failed to find a matching on-disk struct for key [{}, {}, {}]",
+                            header.objectid, header.ty, header.offset
+                        ),
+                    }
                 }
 
                 Ok(Value::Array(arr))
