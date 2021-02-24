@@ -6,7 +6,7 @@ use std::io::Write;
 use anyhow::{anyhow, bail, ensure, Result};
 use nix::unistd::getcwd;
 
-use crate::btrfs::definitions::{BTRFS_SEARCH_KEY, STRUCTS};
+use crate::btrfs::definitions::{BTRFS_KEY, BTRFS_SEARCH_KEY, STRUCTS};
 use crate::btrfs::fs::Fs;
 use crate::btrfs::structs::{Field as BtrfsField, Struct as BtrfsStruct, Type as BtrfsType};
 use crate::lang::ast::*;
@@ -22,6 +22,10 @@ struct StructField {
 #[derive(Clone, PartialEq)]
 struct Struct {
     name: &'static str,
+    /// Disk key for this struct
+    ///
+    /// `None` for nested structs
+    key: Option<(i128, i128, i128)>,
     fields: Vec<StructField>,
 }
 
@@ -61,12 +65,13 @@ impl BtrfsType {
 
                 Value::Array(ret)
             }
-            Self::Struct(s) => Value::Struct(Struct::from_bytes(s, bytes)?),
+            Self::Struct(s) => Value::Struct(Struct::from_bytes(s, None, bytes)?),
             // We do not support named unions, so translate a union type as a struct with fields
             // all constructed from the same offset
             Self::Union(u) => {
                 let mut ret = Struct {
                     name: u.name,
+                    key: None,
                     fields: Vec::with_capacity(u.fields.len()),
                 };
 
@@ -126,7 +131,7 @@ impl Struct {
     ///
     /// The first byte of `bytes` must begin where the struct begins. `bytes` must also contain
     /// _at_least_ `bs.size()` bytes (more is ok).
-    fn from_bytes(bs: &BtrfsStruct, bytes: &[u8]) -> Result<Self> {
+    fn from_bytes(bs: &BtrfsStruct, key: Option<(i128, i128, i128)>, bytes: &[u8]) -> Result<Self> {
         ensure!(
             bs.size() <= bytes.len(),
             "Cannot interpret 'struct {}', not enough bytes provided ({} < {})",
@@ -137,6 +142,7 @@ impl Struct {
 
         let mut ret = Struct {
             name: bs.name,
+            key,
             fields: Vec::with_capacity(bs.fields.len()),
         };
 
@@ -570,7 +576,7 @@ impl<'a> Eval<'a> {
                 }
 
                 let zeros = vec![0; BTRFS_SEARCH_KEY.size()];
-                let mut key = Struct::from_bytes(&*BTRFS_SEARCH_KEY, &zeros)?;
+                let mut key = Struct::from_bytes(&*BTRFS_SEARCH_KEY, None, &zeros)?;
 
                 *(key.field_mut("min_objectid")?) = arg_vals.pop_front().unwrap();
                 *(key.field_mut("max_objectid")?) = Value::Integer(u64::MAX.into());
@@ -630,7 +636,17 @@ impl<'a> Eval<'a> {
                     });
 
                     match s {
-                        Some(s) => arr.push(Value::Struct(Struct::from_bytes(s, &bytes)?)),
+                        Some(s) => arr.push(
+                            Value::Struct(
+                                Struct::from_bytes(
+                                    s,
+                                    Some((
+                                        header.objectid.into(),
+                                        header.ty.into(),
+                                        header.offset.into()
+                                    )),
+                                    &bytes)?)
+                        ),
                         None => eprintln!(
                             "Warning: failed to find a matching on-disk struct for key [{}, {}, {}]",
                             header.objectid, header.ty, header.offset
@@ -654,6 +670,25 @@ impl<'a> Eval<'a> {
                 };
 
                 Ok(Value::String(ty_str))
+            }
+            k @ Function::KeyOf => {
+                ensure!(args.len() == 1, "'{}()' requires 1 argument", k);
+
+                let expr = self.eval_expr(&args[0])?;
+                let s = expr.as_struct()?;
+
+                if let Some((oid, ty, off)) = s.key {
+                    let zeros = vec![0; BTRFS_KEY.size()];
+                    let mut key = Struct::from_bytes(&*BTRFS_KEY, None, &zeros)?;
+
+                    *(key.field_mut("objectid")?) = Value::Integer(oid);
+                    *(key.field_mut("type")?) = Value::Integer(ty);
+                    *(key.field_mut("offset")?) = Value::Integer(off);
+
+                    Ok(Value::Struct(key))
+                } else {
+                    bail!("Could not take '{}()' struct with no on-disk key", k);
+                }
             }
         }
     }
@@ -1569,7 +1604,10 @@ fn test_function_typeof() {
             "\"struct _btrfs_ioctl_search_key\"\n".to_string(),
         ),
         (r#"k = 1; print typeof(k);"#, "\"integer\"\n".to_string()),
-        (r#"k = false; print typeof(k);"#, "\"boolean\"\n".to_string()),
+        (
+            r#"k = false; print typeof(k);"#,
+            "\"boolean\"\n".to_string(),
+        ),
         (r#"k = "str"; print typeof(k);"#, "\"string\"\n".to_string()),
     ];
 
