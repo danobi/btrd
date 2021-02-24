@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::{error, info};
 use rustyline::error::ReadlineError;
 use rustyline::{config::Config as EditorConfig, Editor, Helper};
-use simplelog::{Config as LogConfig, LevelFilter, SimpleLogger};
+use simplelog::{Color, ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
 use structopt::StructOpt;
 
 mod btrfs;
@@ -30,7 +30,12 @@ fn init_logging(debug: bool) -> Result<()> {
         LevelFilter::Error
     };
 
-    match SimpleLogger::init(filter, LogConfig::default()) {
+    let config = ConfigBuilder::new()
+        .set_level_color(Level::Info, Color::Rgb(128, 128, 128))
+        .set_level_color(Level::Error, Color::Red)
+        .build();
+
+    match TermLogger::init(filter, config, TerminalMode::Stderr) {
         Ok(_) => Ok(()),
         Err(e) => bail!("Failed to init logger: {}", e),
     }
