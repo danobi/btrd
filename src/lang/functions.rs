@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 pub enum Function {
     Key,
     Search,
+    Type,
 }
 
 impl TryFrom<&str> for Function {
@@ -17,6 +18,7 @@ impl TryFrom<&str> for Function {
         Ok(match f {
             "key" => Self::Key,
             "search" => Self::Search,
+            "type" => Self::Type,
             _ => bail!("Unknown function: {}", f),
         })
     }
@@ -27,10 +29,11 @@ impl fmt::Display for Function {
         match self {
             Function::Key => write!(f, "key"),
             Function::Search => write!(f, "search"),
+            Function::Type => write!(f, "type"),
         }
     }
 }
 
 lazy_static! {
-    pub static ref FUNCTIONS: Vec<Function> = vec![Function::Key, Function::Search,];
+    pub static ref FUNCTIONS: Vec<Function> = vec![Function::Key, Function::Search, Function::Type];
 }

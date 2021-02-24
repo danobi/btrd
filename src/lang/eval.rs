@@ -640,6 +640,21 @@ impl<'a> Eval<'a> {
 
                 Ok(Value::Array(arr))
             }
+            t @ Function::Type => {
+                ensure!(args.len() == 1, "'{}()' requires 1 argument", t);
+
+                let expr = self.eval_expr(&args[0])?;
+                let ty_str = match expr {
+                    Value::Integer(_) => "integer".to_string(),
+                    Value::String(_) => "string".to_string(),
+                    Value::Boolean(_) => "boolean".to_string(),
+                    Value::Array(_) => "array".to_string(),
+                    Value::Function(_) => "function".to_string(),
+                    Value::Struct(s) => format!("struct {}", s.name),
+                };
+
+                Ok(Value::String(ty_str))
+            }
         }
     }
 
@@ -1529,6 +1544,33 @@ fn test_function_key() {
             r#"k = key(0, 1, 2, 3); k.min_type = 33; print k.min_type;"#,
             format!("{}\n", 33),
         ),
+    ];
+
+    use crate::lang::parse::parse;
+    for (input, expected) in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
+        match eval.eval(&parse(input).expect("Failed to parse")) {
+            EvalResult::Ok => (),
+            _ => assert!(false, "Failed to eval input"),
+        };
+        assert_eq!(
+            String::from_utf8(output).expect("Output not utf-8"),
+            expected
+        );
+    }
+}
+
+#[test]
+fn test_function_type() {
+    let tests = vec![
+        (
+            r#"k = key(0, 1, 2, 3); print type(k);"#,
+            "\"struct _btrfs_ioctl_search_key\"\n".to_string(),
+        ),
+        (r#"k = 1; print type(k);"#, "\"integer\"\n".to_string()),
+        (r#"k = false; print type(k);"#, "\"boolean\"\n".to_string()),
+        (r#"k = "str"; print type(k);"#, "\"string\"\n".to_string()),
     ];
 
     use crate::lang::parse::parse;
