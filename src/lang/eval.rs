@@ -241,7 +241,7 @@ impl fmt::Display for Struct {
             }
         }
 
-        ret += "}}";
+        ret += "}";
 
         write!(f, "{}", ret)
     }
@@ -315,9 +315,9 @@ impl fmt::Display for Value {
                 let mut out = String::new();
                 out += "[\n";
                 for val in array {
-                    let val_str = format!("{}", val);
+                    let val_str = format!("{},", val);
                     for line in val_str.lines() {
-                        out += &format!("{}{},\n", indent(1), line);
+                        out += &format!("{}{}\n", indent(1), line);
                     }
                 }
                 out += "]";
