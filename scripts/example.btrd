@@ -1,0 +1,15 @@
+filesystem "/mnt/btrfs";
+
+k = key(BTRFS_DEV_TREE_OBJECTID, BTRFS_ROOT_ITEM_KEY, 0, 0);
+res = search(BTRFS_ROOT_TREE_OBJECTID, k);
+
+i = 0;
+for v in res {
+  if i == 3 {
+    break;
+  }
+
+  print res[i];
+
+  i += 1;
+}
