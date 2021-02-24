@@ -1,4 +1,6 @@
-use std::io::Write;
+use std::fs::OpenOptions;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
 use log::{error, info};
@@ -23,6 +25,8 @@ struct Opt {
     /// Show debug output
     #[structopt(short, long)]
     debug: bool,
+    /// Run a script (instead of running the REPL)
+    script: Option<PathBuf>,
 }
 
 fn init_logging(debug: bool) -> Result<()> {
@@ -115,12 +119,30 @@ fn repl(sink: &mut dyn Write) -> Result<()> {
     Ok(())
 }
 
+fn script(sink: &mut dyn Write, script: &Path) -> Result<()> {
+    let mut file = OpenOptions::new().read(true).open(script)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    let mut runtime = Runtime::new(sink, true);
+    match runtime.eval(&contents) {
+        EvalResult::Ok | EvalResult::Quit => Ok(()),
+        EvalResult::Err(e) => {
+            eprintln!("Error: {}", e);
+            bail!("Error in script");
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let opts = Opt::from_args();
     init_logging(opts.debug)?;
 
     let mut stdout = std::io::stdout();
-    repl(&mut stdout)?;
 
-    Ok(())
+    if let Some(s) = opts.script {
+        script(&mut stdout, &s)
+    } else {
+        repl(&mut stdout)
+    }
 }
