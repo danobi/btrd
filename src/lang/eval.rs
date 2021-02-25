@@ -979,6 +979,8 @@ impl<'a> Eval<'a> {
 
     fn print_help(&mut self) -> InternalEvalResult {
         let help = vec![
+            ("Commands", ""),
+            ("--------------------", ""),
             ("help", "Print help"),
             ("quit", "Exit debugger"),
             (
@@ -989,6 +991,23 @@ impl<'a> Eval<'a> {
                 "print <expression>",
                 "Evaluate <expression> and print result",
             ),
+            ("", ""),
+            ("Functions", ""),
+            ("--------------------", ""),
+            (
+                "key(objectid, type, offset, transid)",
+                "Returns a key to be used in `search()`",
+            ),
+            (
+                "search(treeid, key)",
+                "Returns an array of search results based on `treeid` and `key`",
+            ),
+            (
+                "keyof(expr)",
+                "Returns the corresponding disk key (if any) of the expression",
+            ),
+            ("typeof(expr)", "Returns the type of `expr` as a string"),
+            ("len(expr)", "Returns the length of an array"),
         ];
 
         let width = help
