@@ -124,7 +124,7 @@ fn script(sink: &mut dyn Write, script: &Path) -> Result<()> {
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
-    let mut runtime = Runtime::new(sink, true);
+    let mut runtime = Runtime::new(sink, false);
     match runtime.eval(&contents) {
         EvalResult::Ok | EvalResult::Quit => Ok(()),
         EvalResult::Err(e) => {
