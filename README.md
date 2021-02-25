@@ -105,7 +105,7 @@ Types:
 * Booleans
 * Arrays (may not be user instantiated)
 * Structs (may not be user defined/instantiated)
-* Functions (may not be user defined)
+* Functions (first-class support; may not be user defined)
 
 Expressions:
 
