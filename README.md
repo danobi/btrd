@@ -30,7 +30,7 @@ struct _btrfs_ioctl_search_key {
 (btrd) len(res)
 297
 
-(btrd) (btrd) res[0]
+(btrd) res[0]
 struct btrfs_root_item {
     .inode = struct btrfs_inode_item {
         .generation = 1,
