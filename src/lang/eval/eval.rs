@@ -243,8 +243,8 @@ impl<'a> Eval<'a> {
 
     fn eval_function(&self, func: &Expression, args: &[Expression]) -> Result<Value> {
         match self.eval_expr(func)?.as_function()? {
-            k @ Function::Key => {
-                ensure!(args.len() == 4, "'{}()' requires 4 arguments", k);
+            f @ Function::Key => {
+                ensure!(args.len() == 4, "'{}()' requires 4 arguments", f);
 
                 // Evaluate args
                 let mut arg_vals = VecDeque::with_capacity(args.len());
@@ -272,8 +272,8 @@ impl<'a> Eval<'a> {
 
                 Ok(Value::Struct(key))
             }
-            s @ Function::Search => {
-                ensure!(args.len() == 2, "'{}()' requires 2 arguments", s);
+            f @ Function::Search => {
+                ensure!(args.len() == 2, "'{}()' requires 2 arguments", f);
 
                 let tree_id = self.eval_expr(&args[0])?.as_integer()?;
                 let key_val = self.eval_expr(&args[1])?;
@@ -336,8 +336,8 @@ impl<'a> Eval<'a> {
 
                 Ok(Value::Array(arr))
             }
-            t @ Function::TypeOf => {
-                ensure!(args.len() == 1, "'{}()' requires 1 argument", t);
+            f @ Function::TypeOf => {
+                ensure!(args.len() == 1, "'{}()' requires 1 argument", f);
 
                 let expr = self.eval_expr(&args[0])?;
                 let ty_str = match expr {
@@ -351,8 +351,8 @@ impl<'a> Eval<'a> {
 
                 Ok(Value::String(ty_str))
             }
-            k @ Function::KeyOf => {
-                ensure!(args.len() == 1, "'{}()' requires 1 argument", k);
+            f @ Function::KeyOf => {
+                ensure!(args.len() == 1, "'{}()' requires 1 argument", f);
 
                 let expr = self.eval_expr(&args[0])?;
                 let s = expr.as_struct()?;
@@ -367,11 +367,11 @@ impl<'a> Eval<'a> {
 
                     Ok(Value::Struct(key))
                 } else {
-                    bail!("Could not take '{}()' struct with no on-disk key", k);
+                    bail!("Could not take '{}()' struct with no on-disk key", f);
                 }
             }
-            l @ Function::Len => {
-                ensure!(args.len() == 1, "'{}()' requires 1 argument", l);
+            f @ Function::Len => {
+                ensure!(args.len() == 1, "'{}()' requires 1 argument", f);
                 let expr = self.eval_expr(&args[0])?;
 
                 Ok(Value::Integer(expr.as_vec()?.len().try_into()?))
