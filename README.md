@@ -90,7 +90,7 @@ struct btrfs_key {
 $ git clone https://github.com/danobi/btrd.git
 $ cd btrd
 $ cargo build --release
-$ sudo ./target/debug/btrd
+$ sudo ./target/release/btrd
 ```
 
 ### Language features
