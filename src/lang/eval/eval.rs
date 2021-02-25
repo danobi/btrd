@@ -1334,8 +1334,41 @@ fn test_function_typeof() {
     }
 }
 
-// TODO: test array indexing
+#[test]
+fn test_array() {
+    let tests = vec![
+        (r#"print arr[0];"#, "3\n".to_string()),
+        (r#"print arr[1];"#, "5\n".to_string()),
+        (r#"print arr[2];"#, "\"asdf\"\n".to_string()),
+        (r#"print len(arr);"#, "3\n".to_string()),
+        (
+            r#"for v in arr { print v; }"#,
+            "3\n5\n\"asdf\"\n".to_string(),
+        ),
+    ];
 
-// TODO: test range based for loop
+    use crate::lang::parse::parse;
+    for (input, expected) in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
 
-// TODO: test len()
+        // Insert a test array
+        eval.variables.insert(
+            Identifier("arr".to_string()),
+            Value::Array(vec![
+                Value::Integer(3),
+                Value::Integer(5),
+                Value::String("asdf".to_string()),
+            ]),
+        );
+
+        match eval.eval(&parse(input).expect("Failed to parse")) {
+            EvalResult::Ok => (),
+            _ => assert!(false, "Failed to eval input"),
+        };
+        assert_eq!(
+            String::from_utf8(output).expect("Output not utf-8"),
+            expected
+        );
+    }
+}
