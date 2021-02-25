@@ -126,4 +126,35 @@ There is not and **will not** be support for:
 
 * Floating point
 
+### Built-in functions
+
+#### `key(min_objectid, min_type, min_offset, min_transid)`
+
+Returns a `struct _btrfs_ioctl_search_key` with the minimums sets to the
+corresponding arguments.
+
+If you want to set maximum values, simply modify the returned struct.
+
+#### `keyof(expr)`
+
+Returns the corresponding disk key of the expression.
+
+Will raise an error if `expr` does not resolve to a top-level on-disk struct
+(top level meaning not nested).
+
+#### `search(tree_id, key)`
+
+Returns an array of search results based on `tree_id` and `key`, where `key`
+must be type `struct _btrfs_ioctl_search_key`.
+
+#### `typeof(expr)`
+
+Returns the type of the expression in string form.
+
+#### `len(expr)`
+
+Returns the length of the array.
+
+Will raise an error if `expr` does not resolve to an array.
+
 [0]: https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop
