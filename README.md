@@ -7,7 +7,7 @@ knowledge of all on-disk types.
 
 ### Demo
 
-```python
+```
 $ sudo btrd
 btrd (the btrfs debugger) v0.1.0
 Type 'help' for help
