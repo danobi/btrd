@@ -37,13 +37,7 @@ struct btrfs_root_item {
         .transid = 0,
         .size = 3,
         .nbytes = 16384,
-        .block_group = 0,
-        .nlink = 1,
-        .uid = 0,
-        .gid = 0,
-        .mode = 16877,
-        .rdev = 0,
-        .flags = 0,
+<...>
         .sequence = 0,
         .reserved = [
             0,
@@ -55,19 +49,6 @@ struct btrfs_root_item {
             .sec = 0,
             .nsec = 0,
         },
-        .ctime = struct btrfs_timespec {
-            .sec = 0,
-            .nsec = 0,
-        },
-        .mtime = struct btrfs_timespec {
-            .sec = 0,
-            .nsec = 0,
-        },
-        .otime = struct btrfs_timespec {
-            .sec = 0,
-            .nsec = 0,
-        },
-    },
 <...>
 
 (btrd) print res[0].inode.nbytes
