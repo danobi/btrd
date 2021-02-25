@@ -101,7 +101,7 @@ tailored to filesystem debugging. The following is a list of language features:
 Types:
 
 * Strings
-* Integers
+* Integers (all integers are internally represented as i128)
 * Booleans
 * Arrays (may not be user instantiated)
 * Structs (may not be user defined/instantiated)
