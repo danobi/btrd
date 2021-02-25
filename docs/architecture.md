@@ -15,7 +15,7 @@
 Manages functions and variable lifetimes.
 
 * `lang/ast.rs`
-* `lang/eval.rs`
+* `lang/eval/*.rs`
 * `lang/parse.rs`
 * `lang/semantics.rs`
 
