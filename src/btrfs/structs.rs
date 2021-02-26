@@ -17,13 +17,15 @@ pub enum Type {
     U32,
     /// NB: little endian
     U64,
-    /// A non-nul terminated string at the end of the struct, param is the name of the field in the
-    /// struct that contains the length
-    TrailingString(&'static str),
     /// (type of elem, number of elems)
     Array(Box<Type>, usize),
     Struct(Struct),
     Union(Union),
+    /// A non-nul terminated string at the end of the struct, param is the name of the field in the
+    /// struct that contains the length
+    TrailingString(&'static str),
+    /// Array of trailing types, second param is the name of the field that contains the count
+    TrailingTypes(Box<Type>, &'static str),
 }
 
 impl Type {
@@ -40,6 +42,8 @@ impl Type {
             Type::Array(t, n) => t.size() * n,
             Type::Struct(s) => s.size(),
             Type::Union(u) => u.size(),
+            // Trailing types are not part of the struct
+            Type::TrailingTypes(_, _) => 0,
         }
     }
 }

@@ -1303,18 +1303,21 @@ mod test {
     }
 
     #[test]
-    fn test_trailing_string_len_fields_exist() {
+    fn test_trailing_fields_exist() {
         for s in &*STRUCTS {
             for field in &s.fields {
-                if let Type::TrailingString(field) = field.ty {
-                    assert!(s.fields.iter().any(|f| {
-                        f.name.map_or(false, |n| n == field)
-                            && (match f.ty {
-                                Type::U8 | Type::U16 | Type::U32 | Type::U64 => true,
-                                _ => false,
-                            })
-                    }));
-                }
+                match field.ty {
+                    Type::TrailingString(len_field) | Type::TrailingTypes(_, len_field) => {
+                        assert!(s.fields.iter().any(|f| {
+                            f.name.map_or(false, |n| n == len_field)
+                                && (match f.ty {
+                                    Type::U8 | Type::U16 | Type::U32 | Type::U64 => true,
+                                    _ => false,
+                                })
+                        }));
+                    }
+                    _ => (),
+                };
             }
         }
     }

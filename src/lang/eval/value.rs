@@ -280,47 +280,85 @@ impl Struct {
         let mut offset: usize = 0;
         let mut trailing_data: usize = 0;
         for field in &bs.fields {
-            if let BtrfsType::TrailingString(n) = &field.ty {
-                let mut found = false;
-
+            let get_field_value = |field_name: &'static str| -> Result<usize> {
                 for processed_field in &ret.fields {
-                    if processed_field.name == *n {
-                        let string_len = processed_field.value.as_integer()? as usize;
-                        let end_of_struct: usize = bs.size() + trailing_data;
-                        let end_of_str: usize = string_len + end_of_struct;
-
-                        // So the next trailing string starts at the right offset
-                        trailing_data += string_len;
-
-                        ensure!(
-                            end_of_str <= bytes.len(),
-                            "Cannot interpret 'struct {}', not enough bytes provided for string read ({} < {})",
-                            bs.name,
-                            bytes.len(),
-                            end_of_str
-                        );
-
-                        ret.fields.push(StructField {
-                            name: field
-                                .name
-                                .ok_or_else(|| anyhow!("TrailingString can't be anonymous"))?,
-                            value: Value::String(
-                                String::from_utf8_lossy(&bytes[end_of_struct..end_of_str])
-                                    .to_string(),
-                            ),
-                        });
-
-                        found = true;
-                        break;
+                    if processed_field.name == field_name {
+                        return Ok(processed_field.value.as_integer()? as usize);
                     }
                 }
 
-                // Should not happen -- there are tests for this
-                ensure!(found, "Did not find string len field in struct");
-            } else {
-                let mut fields = StructField::from_bytes(field, &bytes[offset..])?;
-                ret.fields.append(&mut fields);
-                offset += field.ty.size();
+                bail!(
+                    "Did not find length field '{}' in 'struct {}'",
+                    field_name,
+                    bs.name
+                );
+            };
+
+            match &field.ty {
+                BtrfsType::TrailingString(n) => {
+                    let string_len = get_field_value(n)?;
+                    let end_of_struct: usize = bs.size() + trailing_data;
+                    let end_of_str: usize = string_len + end_of_struct;
+
+                    // So the next trailing type starts at the right offset
+                    trailing_data += string_len;
+
+                    ensure!(
+                        end_of_str <= bytes.len(),
+                        "Cannot interpret 'struct {}', not enough bytes provided for string read ({} < {})",
+                        bs.name,
+                        bytes.len(),
+                        end_of_str
+                    );
+
+                    ret.fields.push(StructField {
+                        name: field
+                            .name
+                            .ok_or_else(|| anyhow!("TrailingString can't be anonymous"))?,
+                        value: Value::String(
+                            String::from_utf8_lossy(&bytes[end_of_struct..end_of_str]).to_string(),
+                        ),
+                    });
+                }
+                BtrfsType::TrailingTypes(ty, n) => {
+                    let count = get_field_value(n)?;
+                    let end_of_struct: usize = bs.size() + trailing_data;
+                    let end_of_trailing_types = (ty.size() * count) + end_of_struct;
+
+                    ensure!(
+                        end_of_trailing_types <= bytes.len(),
+                        "Cannot interpret 'struct {}', not enough bytes provided for trailing types read ({} < {})",
+                        bs.name,
+                        bytes.len(),
+                        end_of_trailing_types
+                    );
+
+                    let mut trailing = Vec::new();
+                    for _ in 0..count {
+                        let start = bs.size() + trailing_data;
+                        let end = start + ty.size();
+
+                        // So the next trailing type starts at the right offset
+                        trailing_data += ty.size();
+
+                        trailing.push(ty.to_value(&bytes[start..end])?);
+                    }
+
+                    ret.fields.push(StructField {
+                        name: field
+                            .name
+                            .ok_or_else(|| anyhow!("TrailingTypes array can't be anonymous"))?,
+                        value: Value::Array(Array {
+                            vec: trailing,
+                            is_hist: false,
+                        }),
+                    });
+                }
+                _ => {
+                    let mut fields = StructField::from_bytes(field, &bytes[offset..])?;
+                    ret.fields.append(&mut fields);
+                    offset += field.ty.size();
+                }
             }
         }
 
@@ -472,6 +510,9 @@ impl BtrfsType {
                 }
 
                 Value::Struct(ret)
+            }
+            Self::TrailingTypes(_, _) => {
+                panic!("Unhandled TrailingTypes -- should be handled at struct level")
             }
         })
     }
@@ -867,6 +908,138 @@ fn test_struct_deserialize() {
         assert_eq!(
             interpreted.fields[3].value.as_string().expect("not string"),
             "world12"
+        );
+    }
+    {
+        let trailing_struct_def = BtrfsStruct {
+            name: "trailing_struct",
+            key_match: |_, _, _| false,
+            fields: vec![
+                BtrfsField {
+                    name: Some("one"),
+                    ty: BtrfsType::U64,
+                },
+                BtrfsField {
+                    name: Some("two"),
+                    ty: BtrfsType::U32,
+                },
+            ],
+        };
+        let struct_def = BtrfsStruct {
+            name: "some_struct",
+            key_match: |_, _, _| false,
+            fields: vec![
+                BtrfsField {
+                    name: Some("boo"),
+                    ty: BtrfsType::U16,
+                },
+                BtrfsField {
+                    name: Some("nr_trailing"),
+                    ty: BtrfsType::U16,
+                },
+                BtrfsField {
+                    name: Some("trailing"),
+                    ty: BtrfsType::TrailingTypes(
+                        Box::new(BtrfsType::Struct(trailing_struct_def)),
+                        "nr_trailing",
+                    ),
+                },
+            ],
+        };
+
+        #[repr(C, packed)]
+        struct TrailingStruct {
+            one: u64,
+            two: u32,
+        }
+
+        #[repr(C, packed)]
+        struct SomeStruct {
+            boo: u16,
+            nr_trailing: u16,
+        }
+
+        let s = SomeStruct {
+            boo: 5,
+            nr_trailing: 2,
+        };
+
+        let t1 = TrailingStruct { one: 1, two: 2 };
+
+        let t2 = TrailingStruct {
+            one: u64::MAX,
+            two: u32::MAX,
+        };
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(unsafe { any_as_u8_slice(&s) });
+        bytes.extend_from_slice(unsafe { any_as_u8_slice(&t1) });
+        bytes.extend_from_slice(unsafe { any_as_u8_slice(&t2) });
+
+        let interpreted =
+            Struct::from_bytes(&struct_def, None, &bytes).expect("Failed to interpret struct");
+
+        assert_eq!(interpreted.name, "some_struct");
+        assert_eq!(interpreted.fields.len(), 3);
+
+        assert_eq!(interpreted.fields[0].name, "boo");
+        assert_eq!(
+            interpreted.fields[0].value.as_integer().expect("not int"),
+            5,
+        );
+
+        assert_eq!(interpreted.fields[1].name, "nr_trailing");
+        assert_eq!(
+            interpreted.fields[1].value.as_integer().expect("not int"),
+            2
+        );
+
+        assert_eq!(interpreted.fields[2].name, "trailing");
+        let trailing_vec = interpreted.fields[2].value.as_vec().expect("not vec");
+        assert_eq!(trailing_vec.len(), 2);
+
+        let struct_0 = trailing_vec[0]
+            .as_struct()
+            .expect("trailing struct not struct");
+        assert_eq!(struct_0.name, "trailing_struct");
+        assert_eq!(struct_0.fields.len(), 2);
+        assert_eq!(struct_0.fields[0].name, "one");
+        assert_eq!(
+            struct_0.fields[0]
+                .value
+                .as_integer()
+                .expect("trailing struct field not int"),
+            1
+        );
+        assert_eq!(struct_0.fields[1].name, "two");
+        assert_eq!(
+            struct_0.fields[1]
+                .value
+                .as_integer()
+                .expect("trailing struct field not int"),
+            2
+        );
+
+        let struct_1 = trailing_vec[1]
+            .as_struct()
+            .expect("trailing struct not struct");
+        assert_eq!(struct_1.name, "trailing_struct");
+        assert_eq!(struct_1.fields.len(), 2);
+        assert_eq!(struct_1.fields[0].name, "one");
+        assert_eq!(
+            struct_1.fields[0]
+                .value
+                .as_integer()
+                .expect("trailing struct field not int"),
+            u64::MAX.into()
+        );
+        assert_eq!(struct_1.fields[1].name, "two");
+        assert_eq!(
+            struct_1.fields[1]
+                .value
+                .as_integer()
+                .expect("trailing struct field not int"),
+            u32::MAX.into()
         );
     }
 }
