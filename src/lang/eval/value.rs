@@ -870,4 +870,3 @@ fn test_struct_deserialize() {
         );
     }
 }
-

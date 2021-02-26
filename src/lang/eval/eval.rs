@@ -723,7 +723,10 @@ impl<'a> Eval<'a> {
             ),
             ("typeof(expr)", "Returns the type of `expr` as a string"),
             ("len(expr)", "Returns the length of an array"),
-            ("hist()", "Returns a histogram (an array that `print()` will format)"),
+            (
+                "hist()",
+                "Returns a histogram (an array that `print()` will format)",
+            ),
         ];
 
         let width = help
