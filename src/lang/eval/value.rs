@@ -143,7 +143,7 @@ impl Array {
             out += &format!(
                 "{:20}{:3} |{:bar_width$}|\n",
                 range,
-                bucket.1,
+                count,
                 bar,
                 bar_width = bar_width
             );
