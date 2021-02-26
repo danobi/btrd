@@ -86,7 +86,8 @@ fn repl(sink: &mut dyn Write) -> Result<()> {
     loop {
         match editor.readline(PROMPT) {
             Ok(line) => {
-                let fixed = input::fixup_input(&line);
+                let decommented = input::strip_comments(&line);
+                let fixed = input::fixup_input(&decommented);
 
                 info!("read: {}", line.escape_debug());
                 info!("cleaned: {}", fixed.escape_debug());
@@ -124,8 +125,10 @@ fn script(sink: &mut dyn Write, script: &Path) -> Result<()> {
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
+    let decommented = input::strip_comments(&contents);
+
     let mut runtime = Runtime::new(sink, false);
-    match runtime.eval(&contents) {
+    match runtime.eval(&decommented) {
         EvalResult::Ok | EvalResult::Quit => Ok(()),
         EvalResult::Err(e) => {
             eprintln!("Error: {}", e);

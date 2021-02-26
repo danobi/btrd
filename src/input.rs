@@ -25,6 +25,31 @@ impl Validator for ReplHelper {
     }
 }
 
+pub fn strip_comments(input: &str) -> String {
+    let mut stripped = String::with_capacity(input.len());
+    for line in input.lines() {
+        let mut in_string = false;
+        for c in line.chars() {
+            if c == '"' {
+                in_string = !in_string;
+            } else if c == '#' && !in_string {
+                // Rest of the line is a comment
+                break;
+            }
+
+            stripped.push(c);
+        }
+
+        // Replace newlines with spaces (it doesn't matter)
+        stripped.push(' ');
+    }
+
+    // Remove extra newline
+    stripped.pop();
+
+    stripped
+}
+
 /// Fixup input so the parser is happy
 ///
 /// Currently does two things:
@@ -37,6 +62,21 @@ pub fn fixup_input(input: &str) -> String {
     }
 
     ret
+}
+
+#[test]
+fn test_strip_comments() {
+    let data = vec![
+        (r#"asdf"#, r#"asdf"#),
+        (r#"asdf #comment"#, r#"asdf "#),
+        (r#"asdf#comment"#, r#"asdf"#),
+        (r#""string#notcomment""#, r#""string#notcomment""#),
+        (r#""string\#notcomment""#, r#""string\#notcomment""#),
+    ];
+
+    for (input, expected) in data {
+        assert_eq!(strip_comments(input), expected);
+    }
 }
 
 #[test]
