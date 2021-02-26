@@ -220,16 +220,24 @@ impl<'a> Eval<'a> {
                 Ok(Value::Boolean(lhs_val != rhs_val))
             }
             BinaryExpression::LogicalOr(lhs, rhs) => {
+                // Lazy evaluation
                 let lhs_val = self.eval_expr(&lhs)?.as_boolean()?;
-                let rhs_val = self.eval_expr(&rhs)?.as_boolean()?;
+                if lhs_val {
+                    return Ok(Value::Boolean(true));
+                }
 
-                Ok(Value::Boolean(lhs_val || rhs_val))
+                let rhs_val = self.eval_expr(&rhs)?.as_boolean()?;
+                Ok(Value::Boolean(rhs_val))
             }
             BinaryExpression::LogicalAnd(lhs, rhs) => {
+                // Lazy evaluation
                 let lhs_val = self.eval_expr(&lhs)?.as_boolean()?;
-                let rhs_val = self.eval_expr(&rhs)?.as_boolean()?;
+                if !lhs_val {
+                    return Ok(Value::Boolean(false));
+                }
 
-                Ok(Value::Boolean(lhs_val && rhs_val))
+                let rhs_val = self.eval_expr(&rhs)?.as_boolean()?;
+                Ok(Value::Boolean(rhs_val))
             }
         }
     }
@@ -839,7 +847,7 @@ fn test_expression() {
             (r#""string" * false;"#),
             (r#""string" / 1234;"#),
             (r#""string" % 1234;"#),
-            ("false && 3;"),
+            ("true && 3;"),
             ("false || 3;"),
             ("false | 3;"),
             ("3 & true;"),
@@ -1056,5 +1064,24 @@ fn test_array() {
             String::from_utf8(output).expect("Output not utf-8"),
             expected
         );
+    }
+}
+
+#[test]
+fn test_logical_lazy_eval() {
+    // Test that invalid expressions don't get reached b/c of lazy evaluation
+    let tests = vec![
+        r#"if false && ("string" + 3) { 1; }"#,
+        r#"if true || ("string" + 3) { 1; }"#,
+    ];
+
+    use crate::lang::parse::parse;
+    for input in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
+        match eval.eval(&parse(input).expect("Failed to parse")) {
+            EvalResult::Ok => (),
+            _ => assert!(false),
+        };
     }
 }
