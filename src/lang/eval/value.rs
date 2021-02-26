@@ -14,7 +14,7 @@ pub enum Value {
     Integer(i128),
     String(String),
     Boolean(bool),
-    Array(Vec<Value>),
+    Array(Array),
     Function(Function),
     Struct(Struct),
 }
@@ -22,7 +22,7 @@ pub enum Value {
 impl Value {
     pub fn short_display(&self) -> String {
         match self {
-            Value::Array(vec) => format!("[][{}]", vec.len()),
+            Value::Array(arr) => format!("[][{}]", arr.vec.len()),
             Value::Struct(s) => format!("struct {}", s.name),
             v => format!("{}", v),
         }
@@ -51,7 +51,7 @@ impl Value {
 
     pub fn as_vec(&self) -> Result<&[Value]> {
         match self {
-            Value::Array(v) => Ok(v),
+            Value::Array(arr) => Ok(&arr.vec),
             v => bail!("Expected array, got '{}'", v.short_display()),
         }
     }
@@ -79,23 +79,168 @@ impl fmt::Display for Value {
             Value::Boolean(b) => {
                 write!(f, "{}", if *b { "true" } else { "false" })
             }
-            Value::Array(array) => {
-                let mut out = String::new();
-                out += "[\n";
-                for val in array {
-                    let val_str = format!("{},", val);
-                    for line in val_str.lines() {
-                        out += &format!("{}{}\n", indent(1), line);
-                    }
-                }
-                out += "]";
-
-                write!(f, "{}", out)
-            }
+            Value::Array(array) => write!(f, "{}", array),
             Value::Function(func) => write!(f, "{}()", func),
             Value::Struct(s) => write!(f, "{}", s),
         }
     }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct Array {
+    pub vec: Vec<Value>,
+    /// If set, print as a histogram.
+    ///
+    /// For all other operations, treat as a regular array
+    pub is_hist: bool,
+}
+
+impl Array {
+    pub fn as_hist(&self) -> Result<String> {
+        let mut vals = Vec::new();
+        for val in &self.vec {
+            match val {
+                Value::Integer(i) => vals.push(i),
+                v => bail!(
+                    "Found invalid value '{}' when printing histogram",
+                    v.short_display()
+                ),
+            };
+        }
+
+        if vals.is_empty() {
+            return Ok(String::new());
+        }
+
+        // ((inclusive_start, exclusive_end), count)
+        let mut buckets: Vec<((i128, i128), usize)> = Vec::new();
+        let min = vals.iter().min().unwrap(); // Already checked vals to contain vals
+        let max = vals.iter().max().unwrap(); // Already checked vals to contain vals
+        let mut cur = previous_power_2(**min)
+            .ok_or_else(|| anyhow!("Failed to find previous power 2 for {}", min))?;
+
+        // Bucket the values
+        while cur < **max {
+            let next = next_power_2(cur)
+                .ok_or_else(|| anyhow!("Failed to find next power 2 for {}", cur))?;
+            let nr_in_bucket = vals.iter().filter(|v| ***v >= cur && ***v < next).count();
+
+            buckets.push(((cur, next), nr_in_bucket));
+            cur = next;
+        }
+
+        // Draw diagram
+        let mut out = String::new();
+        for bucket in buckets {
+            let ((start, end), count) = bucket;
+            let range = format!(
+                "[{}, {})",
+                num_bytes_to_pretty(start),
+                num_bytes_to_pretty(end)
+            );
+            let bar_width = 50;
+            let bar = "@".repeat(count * bar_width / vals.len());
+            out += &format!(
+                "{:20}{:3} |{:bar_width$}|\n",
+                range,
+                bucket.1,
+                bar,
+                bar_width = bar_width
+            );
+        }
+
+        Ok(out)
+    }
+}
+
+impl fmt::Display for Array {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut out = String::new();
+
+        out += "[\n";
+        for val in &self.vec {
+            let val_str = format!("{},", val);
+            for line in val_str.lines() {
+                out += &format!("{}{}\n", indent(1), line);
+            }
+        }
+        out += "]";
+
+        write!(f, "{}", out)
+    }
+}
+
+/// Returns the previous (lower) power of 2 of `x`, or `x` if `x` is already a power of 2
+fn previous_power_2(x: i128) -> Option<i128> {
+    match x {
+        0 => Some(0),
+        x if x > 0 => {
+            let mut i = 1;
+            while i <= x {
+                i = i.checked_shl(1)?;
+            }
+
+            Some(i >> 1)
+        }
+        _ => {
+            let mut i = -1;
+            while i > x {
+                i = i.checked_shl(1)?;
+            }
+
+            Some(i)
+        }
+    }
+}
+
+/// Returns the next power of 2 (strictly greater)
+fn next_power_2(x: i128) -> Option<i128> {
+    if x == -1 {
+        Some(0)
+    } else if x == 0 {
+        Some(1)
+    } else if x > 0 {
+        previous_power_2(x)?.checked_shl(1)
+    } else {
+        previous_power_2(x)?.checked_shr(1)
+    }
+}
+
+/// Returns a pretty representation of `bytes`
+///
+/// eg 1024 -> 1k
+///
+/// Assumes `bytes` is power of 2 already
+fn num_bytes_to_pretty(mut bytes: i128) -> String {
+    assert_eq!(bytes, previous_power_2(bytes).unwrap());
+
+    if bytes == 0 {
+        return "0".to_string();
+    }
+
+    let mut neg = false;
+    if bytes < 0 {
+        neg = true;
+        bytes = -bytes;
+    }
+
+    let mut out = if bytes >> 40 != 0 {
+        format!("{}T", bytes >> 40)
+    } else if bytes >> 30 != 0 {
+        format!("{}G", bytes >> 30)
+    } else if bytes >> 20 != 0 {
+        format!("{}M", bytes >> 20)
+    } else if bytes >> 10 != 0 {
+        format!("{}K", bytes >> 10)
+    } else {
+        bytes.to_string()
+    };
+
+    if neg {
+        out.insert(0, '-');
+    }
+
+    out
 }
 
 #[derive(Clone, PartialEq)]
@@ -306,7 +451,10 @@ impl BtrfsType {
                     ret.push(t.to_value(&bytes[i * tsize..])?);
                 }
 
-                Value::Array(ret)
+                Value::Array(Array {
+                    vec: ret,
+                    is_hist: false,
+                })
             }
             Self::Struct(s) => Value::Struct(Struct::from_bytes(s, None, bytes)?),
             // We do not support named unions, so translate a union type as a struct with fields
@@ -327,4 +475,41 @@ impl BtrfsType {
             }
         })
     }
+}
+
+#[test]
+fn test_previous_power_2() {
+    assert_eq!(previous_power_2(0).unwrap(), 0);
+    assert_eq!(previous_power_2(1).unwrap(), 1);
+    assert_eq!(previous_power_2(3).unwrap(), 2);
+    assert_eq!(previous_power_2(5).unwrap(), 4);
+    assert_eq!(previous_power_2(2049).unwrap(), 2048);
+    assert_eq!(previous_power_2(-2049).unwrap(), -4096);
+    assert_eq!(previous_power_2(-2048).unwrap(), -2048);
+    assert_eq!(previous_power_2(-1).unwrap(), -1);
+    assert_eq!(previous_power_2(-3).unwrap(), -4);
+    assert_eq!(previous_power_2(-4).unwrap(), -4);
+}
+
+#[test]
+fn test_next_power_2() {
+    assert_eq!(next_power_2(0).unwrap(), 1);
+    assert_eq!(next_power_2(1).unwrap(), 2);
+    assert_eq!(next_power_2(2).unwrap(), 4);
+    assert_eq!(next_power_2(3).unwrap(), 4);
+    assert_eq!(next_power_2(5).unwrap(), 8);
+    assert_eq!(next_power_2(-1).unwrap(), 0);
+    assert_eq!(next_power_2(-3).unwrap(), -2);
+    assert_eq!(next_power_2(-4).unwrap(), -2);
+}
+
+#[test]
+fn test_num_bytes_to_pretty() {
+    assert_eq!(num_bytes_to_pretty(0), "0");
+    assert_eq!(num_bytes_to_pretty(8), "8");
+    assert_eq!(num_bytes_to_pretty(4096), "4K");
+    assert_eq!(num_bytes_to_pretty(4 << 20), "4M");
+    assert_eq!(num_bytes_to_pretty(8 << 30), "8G");
+    assert_eq!(num_bytes_to_pretty(16 << 40), "16T");
+    assert_eq!(num_bytes_to_pretty(-16 << 40), "-16T");
 }

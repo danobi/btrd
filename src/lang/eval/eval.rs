@@ -5,7 +5,7 @@ use std::io::Write;
 use anyhow::{anyhow, bail, ensure, Result};
 use nix::unistd::getcwd;
 
-use super::value::{Struct, Value};
+use super::value::{Array, Struct, Value};
 use crate::btrfs::definitions::{BTRFS_KEY, BTRFS_SEARCH_KEY, STRUCTS};
 use crate::btrfs::fs::Fs;
 use crate::lang::ast::*;
@@ -74,14 +74,28 @@ impl<'a> Eval<'a> {
     fn eval_binop_expr(&self, binop: &BinaryExpression) -> Result<Value> {
         match binop {
             BinaryExpression::Plus(lhs, rhs) => {
-                let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
-                let rhs_val = self.eval_expr(&rhs)?.as_integer()?;
+                let lhs_val = self.eval_expr(&lhs)?;
+                let rhs_val = self.eval_expr(&rhs)?;
 
-                let res = lhs_val
-                    .checked_add(rhs_val)
-                    .ok_or_else(|| anyhow!("{} + {} overflows", lhs_val, rhs_val))?;
+                match (lhs_val, rhs_val) {
+                    (Value::Integer(l), Value::Integer(r)) => {
+                        let res = l
+                            .checked_add(r)
+                            .ok_or_else(|| anyhow!("{} + {} overflows", l, r))?;
 
-                Ok(Value::Integer(res))
+                        Ok(Value::Integer(res))
+                    }
+                    (Value::Array(mut arr), v) => {
+                        arr.vec.push(v);
+
+                        Ok(Value::Array(arr))
+                    }
+                    (l, r) => bail!(
+                        "Cannot add types '{}' and '{}'",
+                        l.short_display(),
+                        r.short_display()
+                    ),
+                }
             }
             BinaryExpression::Minus(lhs, rhs) => {
                 let lhs_val = self.eval_expr(&lhs)?.as_integer()?;
@@ -334,7 +348,10 @@ impl<'a> Eval<'a> {
                     }
                 }
 
-                Ok(Value::Array(arr))
+                Ok(Value::Array(Array {
+                    vec: arr,
+                    is_hist: false,
+                }))
             }
             f @ Function::TypeOf => {
                 ensure!(args.len() == 1, "'{}()' requires 1 argument", f);
@@ -375,6 +392,14 @@ impl<'a> Eval<'a> {
                 let expr = self.eval_expr(&args[0])?;
 
                 Ok(Value::Integer(expr.as_vec()?.len().try_into()?))
+            }
+            f @ Function::Hist => {
+                ensure!(args.is_empty(), "'{}()' takes no arguments", f);
+
+                Ok(Value::Array(Array {
+                    vec: Vec::new(),
+                    is_hist: true,
+                }))
             }
         }
     }
@@ -431,10 +456,20 @@ impl<'a> Eval<'a> {
                 InternalEvalResult::Ok
             }
             BuiltinStatement::Print(expr) => match self.eval_expr(expr) {
-                Ok(v) => match writeln!(self.sink, "{}", v) {
-                    Ok(_) => InternalEvalResult::Ok,
-                    Err(e) => InternalEvalResult::Err(e.to_string()),
-                },
+                Ok(v) => {
+                    let out = match v {
+                        Value::Array(arr) if arr.is_hist => match arr.as_hist() {
+                            Ok(o) => o,
+                            Err(e) => return InternalEvalResult::Err(e.to_string()),
+                        },
+                        _ => format!("{}", v),
+                    };
+
+                    match writeln!(self.sink, "{}", out) {
+                        Ok(_) => InternalEvalResult::Ok,
+                        Err(e) => InternalEvalResult::Err(e.to_string()),
+                    }
+                }
                 Err(e) => InternalEvalResult::Err(e.to_string()),
             },
         }
@@ -568,9 +603,9 @@ impl<'a> Eval<'a> {
                 let lhs = self.eval_lhs_assign(expr)?;
 
                 match lhs {
-                    Value::Array(v) => {
-                        let len = v.len();
-                        Ok(v.get_mut::<usize>(idx.try_into()?).ok_or_else(|| {
+                    Value::Array(arr) => {
+                        let len = arr.vec.len();
+                        Ok(arr.vec.get_mut::<usize>(idx.try_into()?).ok_or_else(|| {
                             anyhow!("Index {} out of range, length is {}", idx, len)
                         })?)
                     }
@@ -688,6 +723,7 @@ impl<'a> Eval<'a> {
             ),
             ("typeof(expr)", "Returns the type of `expr` as a string"),
             ("len(expr)", "Returns the length of an array"),
+            ("hist()", "Returns a histogram"),
         ];
 
         let width = help
@@ -1342,6 +1378,10 @@ fn test_array() {
         (r#"print arr[2];"#, "\"asdf\"\n".to_string()),
         (r#"print len(arr);"#, "3\n".to_string()),
         (
+            r#"arr += 99; print len(arr); print arr[3];"#,
+            "4\n99\n".to_string(),
+        ),
+        (
             r#"for v in arr { print v; }"#,
             "3\n5\n\"asdf\"\n".to_string(),
         ),
@@ -1355,11 +1395,14 @@ fn test_array() {
         // Insert a test array
         eval.variables.insert(
             Identifier("arr".to_string()),
-            Value::Array(vec![
-                Value::Integer(3),
-                Value::Integer(5),
-                Value::String("asdf".to_string()),
-            ]),
+            Value::Array(Array {
+                vec: vec![
+                    Value::Integer(3),
+                    Value::Integer(5),
+                    Value::String("asdf".to_string()),
+                ],
+                is_hist: false,
+            }),
         );
 
         match eval.eval(&parse(input).expect("Failed to parse")) {
