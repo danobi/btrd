@@ -711,10 +711,12 @@ lazy_static! {
                     ty: Type::U16,
                 },
                 Field {
-                    name: Some("stripe"),
-                    ty: Type::Struct(BTRFS_STRIPE.clone()),
+                    name: Some("stripes"),
+                    ty: Type::TrailingTypes(
+                        Box::new(Type::Struct(BTRFS_STRIPE.clone())),
+                        "num_stripes",
+                    ),
                 },
-                // TODO: Handle additional trailing stripes
             ],
         },
         Struct {
@@ -1161,7 +1163,6 @@ lazy_static! {
                     name: Some("num_bitmaps"),
                     ty: Type::U64,
                 },
-                // TODO: Handle trailing free space entries
             ],
         },
         Struct {
