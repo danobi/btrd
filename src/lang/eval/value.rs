@@ -254,6 +254,19 @@ pub struct Struct {
 }
 
 impl Struct {
+    fn get_field_value(
+        field_name: &'static str,
+        processed_fields: &[StructField],
+    ) -> Result<usize> {
+        for processed_field in processed_fields {
+            if processed_field.name == field_name {
+                return Ok(processed_field.value.as_integer()? as usize);
+            }
+        }
+
+        bail!("Did not find length field '{}'", field_name,);
+    }
+
     /// Convert raw bytes into a `Struct`
     ///
     /// The first byte of `bytes` must begin where the struct begins. `bytes` must also contain
@@ -279,23 +292,9 @@ impl Struct {
 
         let mut offset: usize = 0;
         for field in &bs.fields {
-            let get_field_value = |field_name: &'static str| -> Result<usize> {
-                for processed_field in &ret.fields {
-                    if processed_field.name == field_name {
-                        return Ok(processed_field.value.as_integer()? as usize);
-                    }
-                }
-
-                bail!(
-                    "Did not find length field '{}' in 'struct {}'",
-                    field_name,
-                    bs.name
-                );
-            };
-
             match &field.ty {
                 BtrfsType::TrailingString(n) => {
-                    let string_len = get_field_value(n)?;
+                    let string_len = Self::get_field_value(n, &ret.fields)?;
                     let end_of_str: usize = string_len + offset;
 
                     ensure!(
@@ -318,7 +317,7 @@ impl Struct {
                     offset += string_len;
                 }
                 BtrfsType::TrailingTypes(ty, n) => {
-                    let count = get_field_value(n)?;
+                    let count = Self::get_field_value(n, &ret.fields)?;
                     let end_of_trailing_types = (ty.size() * count) + offset;
 
                     ensure!(
