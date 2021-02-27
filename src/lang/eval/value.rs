@@ -278,7 +278,6 @@ impl Struct {
         };
 
         let mut offset: usize = 0;
-        let mut trailing_data: usize = 0;
         for field in &bs.fields {
             let get_field_value = |field_name: &'static str| -> Result<usize> {
                 for processed_field in &ret.fields {
@@ -297,11 +296,7 @@ impl Struct {
             match &field.ty {
                 BtrfsType::TrailingString(n) => {
                     let string_len = get_field_value(n)?;
-                    let end_of_struct: usize = bs.size() + trailing_data;
-                    let end_of_str: usize = string_len + end_of_struct;
-
-                    // So the next trailing type starts at the right offset
-                    trailing_data += string_len;
+                    let end_of_str: usize = string_len + offset;
 
                     ensure!(
                         end_of_str <= bytes.len(),
@@ -316,14 +311,15 @@ impl Struct {
                             .name
                             .ok_or_else(|| anyhow!("TrailingString can't be anonymous"))?,
                         value: Value::String(
-                            String::from_utf8_lossy(&bytes[end_of_struct..end_of_str]).to_string(),
+                            String::from_utf8_lossy(&bytes[offset..end_of_str]).to_string(),
                         ),
                     });
+
+                    offset += string_len;
                 }
                 BtrfsType::TrailingTypes(ty, n) => {
                     let count = get_field_value(n)?;
-                    let end_of_struct: usize = bs.size() + trailing_data;
-                    let end_of_trailing_types = (ty.size() * count) + end_of_struct;
+                    let end_of_trailing_types = (ty.size() * count) + offset;
 
                     ensure!(
                         end_of_trailing_types <= bytes.len(),
@@ -335,13 +331,10 @@ impl Struct {
 
                     let mut trailing = Vec::new();
                     for _ in 0..count {
-                        let start = bs.size() + trailing_data;
-                        let end = start + ty.size();
+                        let end = offset + ty.size();
+                        trailing.push(ty.to_value(&bytes[offset..end])?);
 
-                        // So the next trailing type starts at the right offset
-                        trailing_data += ty.size();
-
-                        trailing.push(ty.to_value(&bytes[start..end])?);
+                        offset += ty.size();
                     }
 
                     ret.fields.push(StructField {
