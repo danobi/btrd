@@ -721,7 +721,7 @@ lazy_static! {
         },
         Struct {
             name: "btrfs_extent_item",
-            key_match: |_, ty, _| ty == BTRFS_EXTENT_ITEM_KEY,
+            key_match: |_, ty, _| ty == BTRFS_EXTENT_ITEM_KEY || ty == BTRFS_METADATA_ITEM_KEY,
             fields: vec![
                 Field {
                     name: Some("refs"),
