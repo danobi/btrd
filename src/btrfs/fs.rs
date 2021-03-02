@@ -1,10 +1,11 @@
 use std::alloc::{alloc_zeroed, Layout};
+use std::collections::BTreeSet;
 use std::convert::TryInto;
 use std::mem::size_of;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use log::info;
 use nix::dir::Dir;
 use nix::errno::Errno;
@@ -70,7 +71,7 @@ impl BtrfsIoctlSearchArgsV2 {
 }
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BtrfsIoctlSearchHeader {
     pub transid: u64,
     pub objectid: u64,
@@ -118,7 +119,7 @@ impl Fs {
         max_type: u8,
         mut min_offset: u64,
         max_offset: u64,
-        mut min_transid: u64,
+        min_transid: u64,
         max_transid: u64,
     ) -> Result<Vec<(BtrfsIoctlSearchHeader, Vec<u8>)>> {
         let retry = max_objectid != u64::MAX
@@ -126,6 +127,8 @@ impl Fs {
             || max_offset != u64::MAX
             || max_transid != u64::MAX;
         let mut ret = Vec::new();
+        let mut seen = BTreeSet::new();
+        let mut collisions = 0;
 
         loop {
             let mut args = BtrfsIoctlSearchArgsV2::new();
@@ -170,39 +173,56 @@ impl Fs {
                 let bytes = args.buf[offset..(offset + header.len as usize)].to_vec();
                 offset += header.len as usize;
 
-                ret.push((header, bytes));
+                if seen.contains(&header) {
+                    collisions += 1;
+                } else {
+                    seen.insert(header.clone());
+                    ret.push((header, bytes));
+                }
             }
 
             if !retry || args.key.nr_items == 0 {
                 break;
             }
 
-            // Reset the keys to continue the search
-            min_objectid = ret
+            // Find the largest key in the values we've seen
+            let largest = ret
                 .iter()
-                .map(|(h, _)| h.objectid)
-                .max()
-                .unwrap() // Should have already returned if empty
-                + 1;
-            min_type = (ret
-                .iter()
-                .map(|(h, _)| h.ty)
-                .max()
-                .unwrap() // Should have already returned if empty
-                + 1)
-            .try_into()?;
-            min_offset = ret
-                .iter()
-                .map(|(h, _)| h.offset)
-                .max()
-                .unwrap() // Should have already returned if empty
-                + 1;
-            min_transid = ret
-                .iter()
-                .map(|(h, _)| h.transid)
-                .max()
-                .unwrap() // Should have already returned if empty
-                + 1;
+                .map(|(header, _)| header)
+                .max_by(|lhs, rhs| {
+                    use std::cmp::Ordering;
+
+                    if lhs.objectid < rhs.objectid {
+                        Ordering::Less
+                    } else if lhs.objectid > rhs.objectid {
+                        Ordering::Greater
+                    } else if lhs.ty < rhs.ty {
+                        Ordering::Less
+                    } else if lhs.ty > rhs.ty {
+                        Ordering::Greater
+                    } else if lhs.offset < rhs.offset {
+                        Ordering::Less
+                    } else if lhs.offset > rhs.offset {
+                        Ordering::Greater
+                    } else {
+                        Ordering::Equal
+                    }
+                })
+                .unwrap(); // Should have already returned if empty
+
+            min_objectid = largest.objectid;
+            min_type = largest.ty.try_into()?;
+            min_offset = largest
+                .offset
+                .checked_add(1)
+                .ok_or_else(|| anyhow!("Could not bump key.offset -- overflow detected"))?;
+        }
+
+        if collisions != 0 {
+            bail!(
+                "Saw {} identical payloads -- this should not be possible",
+                collisions
+            );
         }
 
         Ok(ret)
