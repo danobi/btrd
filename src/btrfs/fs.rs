@@ -25,7 +25,7 @@ ioctl_readwrite!(
 );
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct BtrfsIoctlSearchKey {
     tree_id: u64,
     min_objectid: u64,
@@ -145,6 +145,7 @@ impl Fs {
                 Err(e) => bail!(e),
             };
 
+            info!("search() key: {:#?}", args.key);
             info!("search() found {} items", args.key.nr_items);
 
             // Extract all the data from this ioctl
@@ -177,39 +178,31 @@ impl Fs {
             }
 
             // Reset the keys to continue the search
-            if max_objectid != u64::MAX {
-                min_objectid = ret
-                    .iter()
-                    .map(|(h, _)| h.objectid)
-                    .max()
-                    .unwrap() // Should have already returned if empty
-                    + 1;
-            }
-            if max_type != u8::MAX {
-                min_type = (ret
-                    .iter()
-                    .map(|(h, _)| h.ty)
-                    .max()
-                    .unwrap() // Should have already returned if empty
-                    + 1)
-                .try_into()?;
-            }
-            if max_offset != u64::MAX {
-                min_offset = ret
-                    .iter()
-                    .map(|(h, _)| h.offset)
-                    .max()
-                    .unwrap() // Should have already returned if empty
-                    + 1;
-            }
-            if max_transid != u64::MAX {
-                min_transid = ret
-                    .iter()
-                    .map(|(h, _)| h.transid)
-                    .max()
-                    .unwrap() // Should have already returned if empty
-                    + 1;
-            }
+            min_objectid = ret
+                .iter()
+                .map(|(h, _)| h.objectid)
+                .max()
+                .unwrap() // Should have already returned if empty
+                + 1;
+            min_type = (ret
+                .iter()
+                .map(|(h, _)| h.ty)
+                .max()
+                .unwrap() // Should have already returned if empty
+                + 1)
+            .try_into()?;
+            min_offset = ret
+                .iter()
+                .map(|(h, _)| h.offset)
+                .max()
+                .unwrap() // Should have already returned if empty
+                + 1;
+            min_transid = ret
+                .iter()
+                .map(|(h, _)| h.transid)
+                .max()
+                .unwrap() // Should have already returned if empty
+                + 1;
         }
 
         Ok(ret)
