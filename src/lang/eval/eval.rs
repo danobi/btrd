@@ -875,14 +875,14 @@ fn test_expression() {
 #[test]
 fn test_if() {
     let tests = vec![
-        (r#"x = 3; if x == 3 { print "yep"; }"#, "\"yep\"\n"),
+        (r#"x = 3; if x == 3 { print "yep"; }"#, "yep\n"),
         (
             r#"x = 3; if x != 3 { print "nope"; } else { print "yep"; }"#,
-            "\"yep\"\n",
+            "yep\n",
         ),
         (
             r#"x = 3; if x != 3 { print "nope"; } else { print "yep"; if x == 3 { x = 4; } } print x;"#,
-            "\"yep\"\n4\n",
+            "yep\n4\n",
         ),
     ];
 
@@ -996,14 +996,11 @@ fn test_function_typeof() {
     let tests = vec![
         (
             r#"k = key(0, 1, 2, 3); print typeof(k);"#,
-            "\"struct _btrfs_ioctl_search_key\"\n".to_string(),
+            "struct _btrfs_ioctl_search_key\n".to_string(),
         ),
-        (r#"k = 1; print typeof(k);"#, "\"integer\"\n".to_string()),
-        (
-            r#"k = false; print typeof(k);"#,
-            "\"boolean\"\n".to_string(),
-        ),
-        (r#"k = "str"; print typeof(k);"#, "\"string\"\n".to_string()),
+        (r#"k = 1; print typeof(k);"#, "integer\n".to_string()),
+        (r#"k = false; print typeof(k);"#, "boolean\n".to_string()),
+        (r#"k = "str"; print typeof(k);"#, "string\n".to_string()),
     ];
 
     use crate::lang::parse::parse;
@@ -1026,16 +1023,13 @@ fn test_array() {
     let tests = vec![
         (r#"print arr[0];"#, "3\n".to_string()),
         (r#"print arr[1];"#, "5\n".to_string()),
-        (r#"print arr[2];"#, "\"asdf\"\n".to_string()),
+        (r#"print arr[2];"#, "asdf\n".to_string()),
         (r#"print len(arr);"#, "3\n".to_string()),
         (
             r#"arr += 99; print len(arr); print arr[3];"#,
             "4\n99\n".to_string(),
         ),
-        (
-            r#"for v in arr { print v; }"#,
-            "3\n5\n\"asdf\"\n".to_string(),
-        ),
+        (r#"for v in arr { print v; }"#, "3\n5\nasdf\n".to_string()),
     ];
 
     use crate::lang::parse::parse;
