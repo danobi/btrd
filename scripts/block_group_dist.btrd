@@ -1,0 +1,61 @@
+filesystem "/mnt/btrfs";
+
+k = key(0, BTRFS_BLOCK_GROUP_ITEM_KEY, 0, 0);
+k.max_type = BTRFS_BLOCK_GROUP_ITEM_KEY;
+bgs = search(BTRFS_EXTENT_TREE_OBJECTID, k);
+
+blk_group_usage = hist();
+extent_free_space = hist();
+
+for bg in bgs {
+  # First process block group usage
+  bg_key = keyof(bg);
+
+  if bg_key.type != BTRFS_BLOCK_GROUP_ITEM_KEY {
+    continue;
+  }
+
+  if !(bg.flags & BTRFS_BLOCK_GROUP_DATA) {
+    continue;
+  }
+
+  percent_used = 100 * bg.used / bg_key.offset;
+  blk_group_usage += percent_used;
+
+  # Now process free space for each extent in the block group
+  bg_start = bg_key.objectid;
+  bg_len = bg_key.offset;
+  last_end = bg_start;
+
+  k2 = key(bg_start, BTRFS_EXTENT_ITEM_KEY, 0, 0);
+  k2.max_objectid = bg_start + bg_len - 1;
+  k2.max_type = BTRFS_EXTENT_ITEM_KEY;
+  extents = search(BTRFS_EXTENT_TREE_OBJECTID, k2);
+
+  for extent in extents {
+    extent_key = keyof(extent);
+
+    if extent_key.type != BTRFS_EXTENT_ITEM_KEY {
+      continue;
+    }
+
+    if extent_key.objectid >= bg_start + bg_len {
+      break;
+    }
+
+    if last_end < extent_key.objectid {
+      free_bytes = extent_key.objectid - last_end;
+      extent_free_space += free_bytes;
+    }
+
+    last_end = extent_key.objectid + extent_key.offset;
+  }
+}
+
+print "block group usage:";
+print "------------------";
+print blk_group_usage;
+print "";
+print "extent free space:";
+print "------------------";
+print extent_free_space;
