@@ -141,7 +141,7 @@ impl Array {
             let bar_width = 50;
             let bar = "@".repeat(count * bar_width / vals.len());
             out += &format!(
-                "{:20}{:3} |{:bar_width$}|\n",
+                "{:17}{:6} |{:bar_width$}|\n",
                 range,
                 count,
                 bar,
