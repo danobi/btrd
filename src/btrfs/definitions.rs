@@ -11,10 +11,10 @@
 //! (the type of which depend on the primary structure), it's not handled yet. There are plans to
 //! do so.
 
-use super::structs::{Constant, Field, Struct, Type, Union};
-
-use anyhow::Result;
+use anyhow::{bail, ensure, Result};
 use lazy_static::lazy_static;
+
+use super::structs::{Constant, Field, Struct, Type, Union};
 
 const BTRFS_DEV_STAT_WRITE_ERRS: u8 = 0;
 const BTRFS_DEV_STAT_READ_ERRS: u8 = 1;
@@ -605,6 +605,51 @@ lazy_static! {
             },
         ],
     };
+    // Note: `offset` field is omitted b/c the trailing struct always overlaps with it
+    static ref BTRFS_EXTENT_INLINE_REF: Struct = Struct {
+        name: "btrfs_extent_inline_ref",
+        key_match: |_, _, _| false,
+        fields: vec![Field {
+            name: Some("type"),
+            ty: Type::U8,
+        },],
+    };
+    static ref BTRFS_EXTENT_DATA_REF: Struct = Struct {
+        name: "btrfs_extent_data_ref",
+        key_match: |_, _, _| false,
+        fields: vec![
+            Field {
+                name: Some("root"),
+                ty: Type::U64,
+            },
+            Field {
+                name: Some("objectid"),
+                ty: Type::U64,
+            },
+            Field {
+                name: Some("offset"),
+                ty: Type::U64,
+            },
+            Field {
+                name: Some("count"),
+                ty: Type::U32,
+            },
+        ],
+    };
+    static ref BTRFS_SHARED_DATA_REF: Struct = Struct {
+        name: "btrfs_shared_data_ref",
+        key_match: |_, _, _| false,
+        fields: vec![
+            Field {
+                name: Some("type"),
+                ty: Type::U8,
+            },
+            Field {
+                name: Some("offset"),
+                ty: Type::U64,
+            },
+        ],
+    };
     pub static ref STRUCTS: Vec<Struct> = vec![
         BTRFS_SEARCH_KEY.clone(),
         BTRFS_KEY.clone(),
@@ -721,15 +766,93 @@ lazy_static! {
                 },
             ],
         },
+        BTRFS_EXTENT_INLINE_REF.clone(),
+        BTRFS_EXTENT_DATA_REF.clone(),
+        BTRFS_SHARED_DATA_REF.clone(),
         Struct {
             name: "btrfs_extent_item",
             key_match: |_, ty, _| ty == BTRFS_EXTENT_ITEM_KEY || ty == BTRFS_METADATA_ITEM_KEY,
             fields: vec![Field {
                 name: None,
-                ty: Type::DynamicStruct(|_bytes| -> Result<Vec<Field>> {
-                    unimplemented!();
+                ty: Type::DynamicStruct(|bytes| -> Result<Vec<Field>> {
+                    let mut offset: usize = 0;
+                    let mut ret = Vec::new();
+                    let header_len = 24;
+
+                    ensure!(
+                        bytes.len() >= header_len,
+                        "Cannot interpret 'struct btrfs_extent_item', not enough bytes provided ({} < {})",
+                        bytes.len(),
+                        header_len,
+                    );
+
+                    // Static fields
+                    ret.push(Field {
+                        name: Some("refs"),
+                        ty: Type::U64,
+                    });
+                    ret.push(Field {
+                        name: Some("generation"),
+                        ty: Type::U64,
+                    });
+                    ret.push(Field {
+                        name: Some("flags"),
+                        ty: Type::U64,
+                    });
+                    offset += header_len;
+
+                    // We don't know precisely how many items there are so we just keep reading
+                    // until we run out of bytes.
+                    //
+                    // TODO: figure out how to stop this from causing an (almost) infinite loop
+                    // when we implement arbitrary type interpretation.
+                    while offset < bytes.len() {
+                        let inline_header_len = BTRFS_EXTENT_INLINE_REF.size();
+                        ensure!(
+                            bytes.len() >= offset + inline_header_len,
+                            "Cannot interpret 'struct {}', not enough bytes provided ({} < {})",
+                            BTRFS_EXTENT_INLINE_REF.name,
+                            bytes.len(),
+                            offset + inline_header_len,
+                        );
+
+                        let ty: i128 = u8::from_le(bytes[offset]).into();
+                        let mut inline_ref = BTRFS_EXTENT_INLINE_REF.clone();
+                        offset += inline_header_len;
+
+                        if ty == BTRFS_EXTENT_DATA_REF_KEY {
+                            inline_ref.fields.push(Field {
+                                name: Some("data_ref"),
+                                ty: Type::Struct(BTRFS_EXTENT_DATA_REF.clone()),
+                            });
+                            offset += BTRFS_EXTENT_DATA_REF.size();
+                        } else if ty == BTRFS_SHARED_DATA_REF_KEY {
+                            inline_ref.fields.push(Field {
+                                name: Some("shared_data_ref"),
+                                ty: Type::Struct(BTRFS_SHARED_DATA_REF.clone()),
+                            });
+                            offset += BTRFS_SHARED_DATA_REF.size();
+                        } else if ty == BTRFS_SHARED_BLOCK_REF_KEY || ty == BTRFS_TREE_BLOCK_REF_KEY {
+                            inline_ref.fields.push(Field {
+                                name: Some("offset"),
+                                ty: Type::U64,
+                            });
+                            offset += 8;
+                        } else {
+                            bail!("Unknown btrfs_extent_inline_ref type: {}", ty);
+                        }
+
+                        ret.push(Field {
+                            name: Some("inline_ref"),
+                            ty: Type::Struct(inline_ref),
+                        });
+                    }
+
+                    ensure!(offset == bytes.len(), "Leftover data in btrfs_extent_item");
+
+                    Ok(ret)
                 }),
-            },],
+            }],
         },
         Struct {
             name: "btrfs_dev_extent",
