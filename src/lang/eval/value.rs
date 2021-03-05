@@ -346,6 +346,22 @@ impl Struct {
                         }),
                     });
                 }
+                BtrfsType::DynamicStruct(cb) => {
+                    let fields = cb(&bytes[offset..])?;
+                    let mut reified_struct = bs.clone();
+                    reified_struct.fields = fields;
+
+                    ensure!(
+                        reified_struct.is_static_sized(),
+                        "Reified DynamicStruct is not statically sized"
+                    );
+
+                    let mut interpreted_struct =
+                        Struct::from_bytes(&reified_struct, None, &bytes[offset..])?;
+                    ret.fields.append(&mut interpreted_struct.fields);
+
+                    offset += reified_struct.size();
+                }
                 _ => {
                     let mut fields = StructField::from_bytes(field, &bytes[offset..])?;
                     ret.fields.append(&mut fields);
@@ -505,6 +521,9 @@ impl BtrfsType {
             }
             Self::TrailingTypes(_, _) => {
                 panic!("Unhandled TrailingTypes -- should be handled at struct level")
+            }
+            Self::DynamicStruct(_) => {
+                panic!("Unhandled DynamicStruct -- should be handled at struct level")
             }
         })
     }
@@ -1032,6 +1051,54 @@ fn test_struct_deserialize() {
                 .as_integer()
                 .expect("trailing struct field not int"),
             u32::MAX.into()
+        );
+    }
+    {
+        let struct_def = BtrfsStruct {
+            name: "some_struct",
+            key_match: |_, _, _| false,
+            fields: vec![BtrfsField {
+                name: Some("_"),
+                ty: BtrfsType::DynamicStruct(|_bytes| -> Result<Vec<BtrfsField>> {
+                    Ok(vec![
+                        BtrfsField {
+                            name: Some("one"),
+                            ty: BtrfsType::U64,
+                        },
+                        BtrfsField {
+                            name: Some("two"),
+                            ty: BtrfsType::U32,
+                        },
+                    ])
+                }),
+            }],
+        };
+
+        #[repr(C, packed)]
+        struct SomeStruct {
+            one: u64,
+            two: u32,
+        }
+
+        let s = SomeStruct {
+            one: 11111,
+            two: 2222,
+        };
+
+        let interpreted = Struct::from_bytes(&struct_def, None, unsafe { any_as_u8_slice(&s) })
+            .expect("Failed to interpret struct");
+
+        assert_eq!(interpreted.name, "some_struct");
+        assert_eq!(interpreted.fields.len(), 2);
+        assert_eq!(interpreted.fields[0].name, "one");
+        assert_eq!(
+            interpreted.fields[0].value.as_integer().expect("not int"),
+            11111
+        );
+        assert_eq!(interpreted.fields[1].name, "two");
+        assert_eq!(
+            interpreted.fields[1].value.as_integer().expect("not int"),
+            2222
         );
     }
 }

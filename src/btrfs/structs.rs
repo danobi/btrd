@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 /// Represents a btrfs constant (usually defined as a macro in btrfs_tree.h)
 pub struct Constant {
     pub name: &'static str,
@@ -26,6 +28,12 @@ pub enum Type {
     TrailingString(&'static str),
     /// Array of trailing types, second param is the name of the field that contains the count
     TrailingTypes(Box<Type>, &'static str),
+    /// Dynamically determine fields of a struct
+    ///
+    /// Used for structs whose layout can only be known after seeing the bytes.
+    ///
+    /// NB: the returned fields must be statically sized.
+    DynamicStruct(fn(&[u8]) -> Result<Vec<Field>>),
 }
 
 impl Type {
@@ -44,6 +52,19 @@ impl Type {
             Type::Union(u) => u.size(),
             // Trailing types are not part of the struct
             Type::TrailingTypes(_, _) => 0,
+            // No way we can know the size before runtime
+            Type::DynamicStruct(_) => 0,
+        }
+    }
+
+    /// Whether or not this type's size is statically known
+    pub fn is_static_sized(&self) -> bool {
+        match self {
+            Type::U8 | Type::U16 | Type::U32 | Type::U64 => true,
+            Type::Array(t, _) => t.is_static_sized(),
+            Type::Struct(s) => s.is_static_sized(),
+            Type::Union(u) => u.is_static_sized(),
+            Type::TrailingString(_) | Type::TrailingTypes(_, _) | Type::DynamicStruct(_) => false,
         }
     }
 }
@@ -80,6 +101,11 @@ impl Union {
             .max_by_key(|f| f.ty.size())
             .map_or(0, |f| f.ty.size())
     }
+
+    /// Whether or not this union's size is statically known
+    pub fn is_static_sized(&self) -> bool {
+        self.fields.iter().all(|f| f.ty.is_static_sized())
+    }
 }
 
 /// Represents an on-disk btrfs struct
@@ -100,6 +126,11 @@ impl Struct {
     // NB: This assumes that all structs are packed (which they are for btrfs)
     pub fn size(&self) -> usize {
         self.fields.iter().fold(0, |acc, f| acc + f.ty.size())
+    }
+
+    /// Whether or not this struct's size is statically known
+    pub fn is_static_sized(&self) -> bool {
+        self.fields.iter().all(|f| f.ty.is_static_sized())
     }
 }
 

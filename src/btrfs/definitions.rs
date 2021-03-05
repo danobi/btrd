@@ -13,6 +13,7 @@
 
 use super::structs::{Constant, Field, Struct, Type, Union};
 
+use anyhow::Result;
 use lazy_static::lazy_static;
 
 const BTRFS_DEV_STAT_WRITE_ERRS: u8 = 0;
@@ -723,21 +724,12 @@ lazy_static! {
         Struct {
             name: "btrfs_extent_item",
             key_match: |_, ty, _| ty == BTRFS_EXTENT_ITEM_KEY || ty == BTRFS_METADATA_ITEM_KEY,
-            fields: vec![
-                Field {
-                    name: Some("refs"),
-                    ty: Type::U64,
-                },
-                Field {
-                    name: Some("generation"),
-                    ty: Type::U64,
-                },
-                Field {
-                    name: Some("flags"),
-                    ty: Type::U64,
-                },
-                // TODO: Handle additional trailing `btrfs_extent_inline_ref`s
-            ],
+            fields: vec![Field {
+                name: None,
+                ty: Type::DynamicStruct(|_bytes| -> Result<Vec<Field>> {
+                    unimplemented!();
+                }),
+            },],
         },
         Struct {
             name: "btrfs_dev_extent",
@@ -1267,6 +1259,7 @@ mod test {
                     match &field.ty {
                         Type::Struct(s) => recurse_fields(set, &s.fields),
                         Type::Union(u) => recurse_fields(set, &u.fields),
+                        Type::DynamicStruct(_) => (),
                         _ => assert!(false, "Non struct/union anon field"),
                     }
                 }
@@ -1289,13 +1282,16 @@ mod test {
     }
 
     #[test]
-    fn test_only_anon_struct_unions() {
+    fn test_only_anon_struct_unions_or_dynamicstruct() {
         for s in &*STRUCTS {
             for field in &s.fields {
                 if field.name.is_none() {
                     match field.ty {
-                        Type::Struct(_) | Type::Union(_) => (),
-                        _ => assert!(false, "Anonymous field is not struct or union"),
+                        Type::Struct(_) | Type::Union(_) | Type::DynamicStruct(_) => (),
+                        _ => assert!(
+                            false,
+                            "Anonymous field is not struct, union or dynamic struct"
+                        ),
                     }
                 }
             }
