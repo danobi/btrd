@@ -407,9 +407,9 @@ lazy_static! {
         ],
     };
     static ref BTRFS_TIMESPEC: Struct = Struct {
-         name: "btrfs_timespec",
-         key_match: |_, _, _| false,
-         fields: vec![
+        name: "btrfs_timespec",
+        key_match: |_, _, _| false,
+        fields: vec![
             Field {
                 name: Some("sec"),
                 ty: Type::U64,
@@ -418,7 +418,7 @@ lazy_static! {
                 name: Some("nsec"),
                 ty: Type::U32,
             },
-         ],
+        ],
     };
     static ref BTRFS_INODE_ITEM: Struct = Struct {
         name: "btrfs_inode_item",
@@ -523,9 +523,9 @@ lazy_static! {
         ],
     };
     static ref BTRFS_DISK_BALANCE_ARGS: Struct = Struct {
-         name: "btrfs_disk_balance_args",
-         key_match: |_, _, _| false,
-         fields: vec![
+        name: "btrfs_disk_balance_args",
+        key_match: |_, _, _| false,
+        fields: vec![
             Field {
                 name: Some("profiles"),
                 ty: Type::U64,
@@ -602,7 +602,7 @@ lazy_static! {
                 name: Some("unused"),
                 ty: Type::Array(Box::new(Type::U64), 6),
             },
-         ],
+        ],
     };
     pub static ref STRUCTS: Vec<Struct> = vec![
         BTRFS_SEARCH_KEY.clone(),
@@ -672,7 +672,8 @@ lazy_static! {
         BTRFS_STRIPE.clone(),
         Struct {
             name: "btrfs_chunk",
-            key_match: |o, ty, _| o == BTRFS_FIRST_CHUNK_TREE_OBJECTID && ty == BTRFS_CHUNK_ITEM_KEY,
+            key_match: |o, ty, _| o == BTRFS_FIRST_CHUNK_TREE_OBJECTID
+                && ty == BTRFS_CHUNK_ITEM_KEY,
             fields: vec![
                 Field {
                     name: Some("length"),
@@ -809,12 +810,10 @@ lazy_static! {
         Struct {
             name: "btrfs_dir_log_item",
             key_match: |_, ty, _| ty == BTRFS_INODE_EXTREF_KEY || ty == BTRFS_DIR_LOG_INDEX_KEY,
-            fields: vec![
-                Field {
-                    name: Some("end"),
-                    ty: Type::U64,
-                },
-            ],
+            fields: vec![Field {
+                name: Some("end"),
+                ty: Type::U64,
+            },],
         },
         Struct {
             name: "btrfs_dir_item",
@@ -983,7 +982,9 @@ lazy_static! {
         BTRFS_DISK_BALANCE_ARGS.clone(),
         Struct {
             name: "btrfs_balance_item",
-            key_match: |oid, ty, off| oid == BTRFS_BALANCE_OBJECTID && ty == BTRFS_TEMPORARY_ITEM_KEY && off == 0,
+            key_match: |oid, ty, off| oid == BTRFS_BALANCE_OBJECTID
+                && ty == BTRFS_TEMPORARY_ITEM_KEY
+                && off == 0,
             fields: vec![
                 Field {
                     name: Some("flags"),
@@ -1051,23 +1052,21 @@ lazy_static! {
         },
         Struct {
             name: "btrfs_csum_item",
-            key_match: |oid, ty, _| oid == BTRFS_EXTENT_CSUM_OBJECTID.into() && ty == BTRFS_EXTENT_CSUM_KEY,
-            fields: vec![
-                Field {
-                    name: Some("csum"),
-                    ty: Type::U8,
-                },
-            ],
+            key_match: |oid, ty, _| oid == BTRFS_EXTENT_CSUM_OBJECTID.into()
+                && ty == BTRFS_EXTENT_CSUM_KEY,
+            fields: vec![Field {
+                name: Some("csum"),
+                ty: Type::U8,
+            },],
         },
         Struct {
             name: "btrfs_dev_stats_item",
-            key_match: |oid, ty, _| oid == BTRFS_DEV_STATS_OBJECTID && ty == BTRFS_PERSISTENT_ITEM_KEY,
-            fields: vec![
-                Field {
-                    name: Some("values"),
-                    ty: Type::Array(Box::new(Type::U64), BTRFS_DEV_STAT_VALUES_MAX.into()),
-                },
-            ],
+            key_match: |oid, ty, _| oid == BTRFS_DEV_STATS_OBJECTID
+                && ty == BTRFS_PERSISTENT_ITEM_KEY,
+            fields: vec![Field {
+                name: Some("values"),
+                ty: Type::Array(Box::new(Type::U64), BTRFS_DEV_STAT_VALUES_MAX.into()),
+            },],
         },
         Struct {
             name: "btrfs_dev_replace_item",
