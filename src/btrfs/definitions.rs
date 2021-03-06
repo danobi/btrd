@@ -806,6 +806,10 @@ lazy_static! {
                     //
                     // TODO: figure out how to stop this from causing an (almost) infinite loop
                     // when we implement arbitrary type interpretation.
+                    //
+                    // The only place the count is contained is in the leaf header. One way to find
+                    // the leaf header is to scan until you see the FSID magic value which is
+                    // present in the header. This seems like the easiest way.
                     while offset < bytes.len() {
                         let inline_header_len = BTRFS_EXTENT_INLINE_REF.size();
                         ensure!(
