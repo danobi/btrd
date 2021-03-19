@@ -1,12 +1,14 @@
 use std::alloc::{alloc_zeroed, Layout};
 use std::collections::BTreeSet;
 use std::convert::TryInto;
+use std::fs::{File, OpenOptions};
 use std::mem::size_of;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
 use anyhow::{anyhow, bail, ensure, Result};
 use log::info;
+use memmap::MmapMut;
 use nix::dir::Dir;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
@@ -14,6 +16,9 @@ use nix::ioctl_readwrite;
 use nix::sys::{stat::Mode, statfs::fstatfs};
 use nix::Error as NixError;
 
+const BTRFS_SUPERBLOCK_MAGIC: [u8; 8] = *b"_BHRfS_M";
+const BTRFS_SUPERBLOCK_MAGIC_LOCS: [usize; 3] =
+    [0x1_0000 + 0x40, 0x400_0000 + 0x40, 0x40_0000_0000 + 0x40];
 const BTRFS_FSTYPE: i64 = 0x9123683e;
 const BTRFS_IOC_MAGIC: usize = 0x94;
 const MAX_BUF_SIZE: usize = 16 << 20; // 16 MB
@@ -80,22 +85,42 @@ pub struct BtrfsIoctlSearchHeader {
     pub len: u32,
 }
 
+enum FsInner {
+    Mounted(Dir),
+    Unmounted(MmapMut),
+}
+
 /// Main struct for interacting with btrfs filesystem
 ///
 /// Holds a refcount on the FS while alive and decrements when struct is dropped (to prevent FS
 /// from being unmounted while we're debugging)
 pub struct Fs {
-    fs: Dir,
+    inner: FsInner,
 }
 
 impl Fs {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let fs = Dir::open(
+        if let Ok(d) = Dir::open(
             path.as_ref(),
             OFlag::O_DIRECTORY | OFlag::O_RDONLY,
             Mode::empty(),
-        )?;
+        ) {
+            Self::new_mounted(d, path)
+        } else if let Ok(f) = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path.as_ref())
+        {
+            Self::new_unmounted(f, path)
+        } else {
+            bail!(
+                "{} is neither a mounted nor unmounted btrfs filesystem",
+                path.as_ref().display()
+            );
+        }
+    }
 
+    fn new_mounted<P: AsRef<Path>>(fs: Dir, path: P) -> Result<Self> {
         let statfs = fstatfs(&fs)?;
         ensure!(
             statfs.filesystem_type().0 == BTRFS_FSTYPE,
@@ -103,7 +128,35 @@ impl Fs {
             path.as_ref().display()
         );
 
-        Ok(Self { fs })
+        Ok(Self {
+            inner: FsInner::Mounted(fs),
+        })
+    }
+
+    fn has_superblock_magic(fs: &[u8]) -> bool {
+        for loc in &BTRFS_SUPERBLOCK_MAGIC_LOCS {
+            if let Some(magic) = fs.get(*loc..(loc + 8)) {
+                if magic == BTRFS_SUPERBLOCK_MAGIC {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn new_unmounted<P: AsRef<Path>>(fs: File, path: P) -> Result<Self> {
+        let mmap = unsafe { MmapMut::map_mut(&fs) }?;
+
+        ensure!(
+            Self::has_superblock_magic(&*mmap),
+            "Failed to find valid superblock magic for: {}",
+            path.as_ref().display(),
+        );
+
+        Ok(Self {
+            inner: FsInner::Unmounted(mmap),
+        })
     }
 
     /// Issues search v2 ioctl with given parameters
@@ -122,6 +175,10 @@ impl Fs {
         min_transid: u64,
         max_transid: u64,
     ) -> Result<Vec<(BtrfsIoctlSearchHeader, Vec<u8>)>> {
+        let fs = match &self.inner {
+            FsInner::Mounted(fs) => fs,
+            FsInner::Unmounted(_) => bail!("Cannot search() an unmounted filesystem"),
+        };
         let retry = max_objectid != u64::MAX
             || max_type != u8::MAX
             || max_offset != u64::MAX
@@ -142,7 +199,7 @@ impl Fs {
             args.key.min_transid = min_transid;
             args.key.max_transid = max_transid;
 
-            match unsafe { btrfs_tree_search_v2(self.fs.as_raw_fd(), &mut *args) } {
+            match unsafe { btrfs_tree_search_v2(fs.as_raw_fd(), &mut *args) } {
                 Ok(_) => (),
                 Err(NixError::Sys(Errno::EOVERFLOW)) => (),
                 Err(e) => bail!(e),
