@@ -42,9 +42,9 @@ impl Value {
         }
     }
 
-    pub fn as_string(&self) -> Result<&str> {
+    pub fn as_string(&self) -> Result<String> {
         match self {
-            Value::String(s) => Ok(s),
+            Value::String(s) => Ok(s.clone()),
             v => bail!("Expected string, got '{}'", v.short_display()),
         }
     }
@@ -248,7 +248,7 @@ pub struct Struct {
     pub name: &'static str,
     /// Disk key for this struct
     ///
-    /// `None` for nested structs
+    /// `None` for nested structs or unmounted images
     pub key: Option<(i128, i128, i128)>,
     pub fields: Vec<StructField>,
 }

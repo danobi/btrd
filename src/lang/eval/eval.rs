@@ -260,7 +260,52 @@ impl<'a> Eval<'a> {
                 let expr_val = self.eval_expr(expr)?.as_integer()?;
                 Ok(Value::Integer(-expr_val))
             }
-            UnaryExpression::Cast(type_spec, expr) => unimplemented!(),
+            UnaryExpression::Cast(type_spec, expr) => {
+                let bytenr = {
+                    let bytenr = self.eval_expr(expr)?.as_integer()?;
+                    if bytenr < 0 {
+                        bail!(
+                            "Invalid bytenr ({}) in type cast: must be non-negative",
+                            bytenr
+                        );
+                    }
+
+                    bytenr as usize
+                };
+
+                match type_spec {
+                    TypeSpecifier::Struct(ty) => {
+                        let s_name = match &**ty {
+                            Expression::PrimaryExpression(PrimaryExpression::Identifier(
+                                Identifier(ident),
+                            )) => ident,
+                            _ => panic!("Semantic analysis failed -- tell Daniel"),
+                        };
+                        // Already verified in semantic analyser struct exists
+                        let s = STRUCTS.iter().find(|s| s.name == s_name).unwrap();
+
+                        let mut struct_size = s.size();
+                        if s.size() == 0 {
+                            // TODO: make size unbounded once leaf reading code is in
+                            // (see comment for `struct btrfs_extent_item`)
+                            struct_size = 1024;
+                        }
+
+                        let val = match &self.fs {
+                            Some(fs) => {
+                                Value::Struct(Struct::from_bytes(
+                                    s, None, fs.get_bytes(bytenr..(bytenr+struct_size))?)?
+                                )
+                            }
+                            None => bail!(
+                                "No filesystem set, set a filesystem first with 'filesystem \"/path\"'"
+                            ),
+                        };
+
+                        Ok(val)
+                    }
+                }
+            }
         }
     }
 

@@ -5,6 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::mem::size_of;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
+use std::slice::SliceIndex;
 
 use anyhow::{anyhow, bail, ensure, Result};
 use log::info;
@@ -283,5 +284,17 @@ impl Fs {
         }
 
         Ok(ret)
+    }
+
+    pub fn get_bytes<I>(&self, index: I) -> Result<&I::Output>
+    where
+        I: SliceIndex<[u8]> + std::fmt::Debug,
+    {
+        match &self.inner {
+            FsInner::Unmounted(fs) => fs
+                .get(index)
+                .ok_or_else(|| anyhow!("Index out of range, max length is {}", fs.len())),
+            FsInner::Mounted(_) => bail!("Cannot reinterpret bytes from mounted image"),
+        }
     }
 }
