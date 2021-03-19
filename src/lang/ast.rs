@@ -8,6 +8,8 @@ pub enum UnaryExpression {
     Not(Box<Expression>),
     /// `-`
     Minus(Box<Expression>),
+    /// `(struct Foo) bar`
+    Cast(TypeSpecifier, Box<Expression>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -63,6 +65,11 @@ impl fmt::Display for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TypeSpecifier {
+    Struct(Box<Expression>),
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -133,6 +133,10 @@ fn ident<'a>() -> Parser<'a, char, Expression> {
     .map(|i| Expression::PrimaryExpression(PrimaryExpression::Identifier(i)))
 }
 
+fn type_specifier<'a>() -> Parser<'a, char, TypeSpecifier> {
+    (tag("struct") - space() + ident()).map(|(_, id)| TypeSpecifier::Struct(Box::new(id)))
+}
+
 fn primary_expr<'a>() -> Parser<'a, char, Expression> {
     let paren = (sym('(') * call(expr) - space() - sym(')'))
         .map(|e| Expression::PrimaryExpression(PrimaryExpression::Paren(Box::new(e))));
@@ -177,18 +181,38 @@ fn postfix_expr<'a>() -> Parser<'a, char, Expression> {
 }
 
 fn unary_expr<'a>() -> Parser<'a, char, Expression> {
-    let ops = tag("~") | tag("!") | tag("-");
-    let bnot_not_minus = (ops - space()).repeat(0..) - space() + call(postfix_expr);
+    enum UnaryOp {
+        BitNot,
+        Not,
+        Minus,
+        Cast(TypeSpecifier),
+    }
+
+    let bnot = tag("~").map(|_| UnaryOp::BitNot);
+    let not = tag("!").map(|_| UnaryOp::Not);
+    let minus = tag("-").map(|_| UnaryOp::Minus);
+    let cast = (tag("(") * space() * type_specifier() - space() - tag(")")).map(UnaryOp::Cast);
+
+    let ops = bnot | not | minus | cast;
+    let bnot_not_minus_cast = (ops - space()).repeat(0..) - space() + call(postfix_expr);
 
     // NB: unary expression are right-to-left associativity, so fold-right
-    bnot_not_minus.map(|(mut ops, expr)| {
+    bnot_not_minus_cast.map(|(mut ops, expr)| {
         let mut expr = expr;
         while let Some(op) = ops.pop() {
             match op {
-                "~" => expr = Expression::UnaryExpression(UnaryExpression::BitNot(Box::new(expr))),
-                "!" => expr = Expression::UnaryExpression(UnaryExpression::Not(Box::new(expr))),
-                "-" => expr = Expression::UnaryExpression(UnaryExpression::Minus(Box::new(expr))),
-                _ => panic!("Unhandled unary operator: {}", op),
+                UnaryOp::BitNot => {
+                    expr = Expression::UnaryExpression(UnaryExpression::BitNot(Box::new(expr)))
+                }
+                UnaryOp::Not => {
+                    expr = Expression::UnaryExpression(UnaryExpression::Not(Box::new(expr)))
+                }
+                UnaryOp::Minus => {
+                    expr = Expression::UnaryExpression(UnaryExpression::Minus(Box::new(expr)))
+                }
+                UnaryOp::Cast(ts) => {
+                    expr = Expression::UnaryExpression(UnaryExpression::Cast(ts, Box::new(expr)))
+                }
             }
         }
 
@@ -1021,18 +1045,64 @@ fn test_logic_expr() {
 #[test]
 fn test_unary_expr() {
     {
-        let data = vec![(
-            "~!-5",
-            Expression::UnaryExpression(UnaryExpression::BitNot(Box::new(
-                Expression::UnaryExpression(UnaryExpression::Not(Box::new(
-                    Expression::UnaryExpression(UnaryExpression::Minus(Box::new(
-                        Expression::PrimaryExpression(PrimaryExpression::Constant(
-                            Constant::Integer(5),
-                        )),
+        let data = vec![
+            (
+                "~!-5",
+                Expression::UnaryExpression(UnaryExpression::BitNot(Box::new(
+                    Expression::UnaryExpression(UnaryExpression::Not(Box::new(
+                        Expression::UnaryExpression(UnaryExpression::Minus(Box::new(
+                            Expression::PrimaryExpression(PrimaryExpression::Constant(
+                                Constant::Integer(5),
+                            )),
+                        ))),
                     ))),
                 ))),
-            ))),
-        )];
+            ),
+            (
+                "(struct foo) 123",
+                Expression::UnaryExpression(UnaryExpression::Cast(
+                    TypeSpecifier::Struct(Box::new(Expression::PrimaryExpression(
+                        PrimaryExpression::Identifier(Identifier("foo".to_string())),
+                    ))),
+                    Box::new(Expression::PrimaryExpression(PrimaryExpression::Constant(
+                        Constant::Integer(123),
+                    ))),
+                )),
+            ),
+            (
+                "(struct foo) !!123",
+                Expression::UnaryExpression(UnaryExpression::Cast(
+                    TypeSpecifier::Struct(Box::new(Expression::PrimaryExpression(
+                        PrimaryExpression::Identifier(Identifier("foo".to_string())),
+                    ))),
+                    Box::new(Expression::UnaryExpression(UnaryExpression::Not(Box::new(
+                        Expression::UnaryExpression(UnaryExpression::Not(Box::new(
+                            Expression::PrimaryExpression(PrimaryExpression::Constant(
+                                Constant::Integer(123),
+                            )),
+                        ))),
+                    )))),
+                )),
+            ),
+            (
+                "(struct foo)(struct bar)(123)",
+                Expression::UnaryExpression(UnaryExpression::Cast(
+                    TypeSpecifier::Struct(Box::new(Expression::PrimaryExpression(
+                        PrimaryExpression::Identifier(Identifier("foo".to_string())),
+                    ))),
+                    Box::new(Expression::UnaryExpression(UnaryExpression::Cast(
+                        TypeSpecifier::Struct(Box::new(Expression::PrimaryExpression(
+                            PrimaryExpression::Identifier(Identifier("bar".to_string())),
+                        ))),
+                        Box::new(Expression::PrimaryExpression(PrimaryExpression::Paren(
+                            Box::new(Expression::PrimaryExpression(PrimaryExpression::Constant(
+                                Constant::Integer(123),
+                            ))),
+                        ))),
+                    ))),
+                )),
+            ),
+        ];
 
         for (input, expected) in data {
             let input: Vec<char> = input.chars().collect();

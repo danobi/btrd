@@ -69,6 +69,7 @@ impl SemanticAnalyzer {
             UnaryExpression::BitNot(e) | UnaryExpression::Not(e) | UnaryExpression::Minus(e) => {
                 self.analyze_expr(&*e)
             }
+            UnaryExpression::Cast(t, e) => unimplemented!(),
         }
     }
 

@@ -260,6 +260,7 @@ impl<'a> Eval<'a> {
                 let expr_val = self.eval_expr(expr)?.as_integer()?;
                 Ok(Value::Integer(-expr_val))
             }
+            UnaryExpression::Cast(type_spec, expr) => unimplemented!(),
         }
     }
 
