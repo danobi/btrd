@@ -4,6 +4,7 @@
 //! use-before-assigns, invalid statements, jump statements outside loops, etc.
 use anyhow::{anyhow, bail, ensure, Result};
 
+use crate::btrfs::definitions::STRUCTS;
 use crate::lang::ast::*;
 use crate::lang::variables::Variables;
 
@@ -69,7 +70,24 @@ impl SemanticAnalyzer {
             UnaryExpression::BitNot(e) | UnaryExpression::Not(e) | UnaryExpression::Minus(e) => {
                 self.analyze_expr(&*e)
             }
-            UnaryExpression::Cast(t, e) => unimplemented!(),
+            UnaryExpression::Cast(t, e) => match t {
+                TypeSpecifier::Struct(ty) => match &**ty {
+                    Expression::PrimaryExpression(PrimaryExpression::Identifier(Identifier(
+                        ident,
+                    ))) => {
+                        ensure!(
+                            STRUCTS.iter().any(|s| s.name == ident),
+                            "Unknown type: struct {}",
+                            ident,
+                        );
+
+                        self.analyze_expr(e)?;
+
+                        Ok(())
+                    }
+                    _ => bail!("Invalid type in type cast"),
+                },
+            },
         }
     }
 
@@ -338,5 +356,23 @@ fn test_builtin() {
         "#;
         let stmts = parse(prog);
         analyze(&stmts).expect("Semantic analysis failed")
+    }
+}
+
+#[test]
+fn test_type_cast() {
+    {
+        let prog = r#"
+            (struct btrfs_key) 1;
+        "#;
+        let stmts = parse(prog);
+        analyze(&stmts).expect("Semantic analysis failed");
+    }
+    {
+        let prog = r#"
+            (struct btrfs_keyz) 1;
+        "#;
+        let stmts = parse(prog);
+        analyze(&stmts).expect_err("Semantic analysis passed");
     }
 }
