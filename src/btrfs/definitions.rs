@@ -40,6 +40,7 @@ const BTRFS_RAID_RAID6: i128 = 6;
 const BTRFS_RAID_RAID1C3: i128 = 7;
 const BTRFS_RAID_RAID1C4: i128 = 8;
 const BTRFS_NR_RAID_TYPES: i128 = 9;
+const BTRFS_FSID_SIZE: u8 = 16;
 const BTRFS_UUID_SIZE: u8 = 16;
 const BTRFS_ROOT_TREE_OBJECTID: i128 = 1;
 const BTRFS_EXTENT_TREE_OBJECTID: i128 = 2;
@@ -109,7 +110,7 @@ const BTRFS_DEV_REPLACE_KEY: i128 = 250;
 const BTRFS_UUID_KEY_SUBVOL: i128 = 251;
 const BTRFS_UUID_KEY_RECEIVED_SUBVOL: i128 = 252;
 const BTRFS_STRING_ITEM_KEY: i128 = 253;
-const BTRFS_CSUM_SIZE: i128 = 32;
+const BTRFS_CSUM_SIZE: u8 = 32;
 const BTRFS_FT_UNKNOWN: i128 = 0;
 const BTRFS_FT_REG_FILE: i128 = 1;
 const BTRFS_FT_DIR: i128 = 2;
@@ -209,6 +210,7 @@ lazy_static! {
         constant!(BTRFS_RAID_RAID1C3),
         constant!(BTRFS_RAID_RAID1C4),
         constant!(BTRFS_NR_RAID_TYPES),
+        constant!(BTRFS_FSID_SIZE),
         constant!(BTRFS_UUID_SIZE),
         constant!(BTRFS_ROOT_TREE_OBJECTID),
         constant!(BTRFS_EXTENT_TREE_OBJECTID),
@@ -654,6 +656,48 @@ lazy_static! {
         BTRFS_SEARCH_KEY.clone(),
         BTRFS_KEY.clone(),
         Struct {
+            name: "btrfs_header",
+            key_match: |_, _, _| false,
+            fields: vec![
+                Field {
+                    name: Some("csum"),
+                    ty: Type::Array(Box::new(Type::U8), BTRFS_CSUM_SIZE.into()),
+                },
+                Field {
+                    name: Some("fsid"),
+                    ty: Type::Array(Box::new(Type::U8), BTRFS_FSID_SIZE.into()),
+                },
+                Field {
+                    name: Some("bytenr"),
+                    ty: Type::U64,
+                },
+                Field {
+                    name: Some("flags"),
+                    ty: Type::U64,
+                },
+                Field {
+                    name: Some("chunk_tree_uuid"),
+                    ty: Type::Array(Box::new(Type::U8), BTRFS_UUID_SIZE.into()),
+                },
+                Field {
+                    name: Some("generation"),
+                    ty: Type::U64,
+                },
+                Field {
+                    name: Some("owner"),
+                    ty: Type::U64,
+                },
+                Field {
+                    name: Some("nritems"),
+                    ty: Type::U32,
+                },
+                Field {
+                    name: Some("level"),
+                    ty: Type::U8,
+                },
+            ],
+        },
+        Struct {
             name: "btrfs_dev_item",
             key_match: |o, ty, _| o == BTRFS_DEV_ITEMS_OBJECTID && ty == BTRFS_DEV_ITEM_KEY,
             fields: vec![
@@ -711,7 +755,7 @@ lazy_static! {
                 },
                 Field {
                     name: Some("fsid"),
-                    ty: Type::Array(Box::new(Type::U8), BTRFS_UUID_SIZE.into()),
+                    ty: Type::Array(Box::new(Type::U8), BTRFS_FSID_SIZE.into()),
                 },
             ],
         },
