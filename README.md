@@ -96,6 +96,7 @@ Expressions:
 * Function calls
 * Struct field access
 * Array indexes
+* Type casts (`(struct btrfs_root) physical_bytenr`)
 
 Control flow:
 
