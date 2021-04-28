@@ -124,7 +124,7 @@ impl Fs {
     fn new_mounted<P: AsRef<Path>>(fs: Dir, path: P) -> Result<Self> {
         let statfs = fstatfs(&fs)?;
         ensure!(
-            statfs.filesystem_type().0 == BTRFS_FSTYPE,
+            statfs.filesystem_type().0 == BTRFS_FSTYPE.try_into().unwrap(),
             "{} is not a btrfs filesystem",
             path.as_ref().display()
         );
