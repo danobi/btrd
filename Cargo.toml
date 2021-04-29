@@ -1,8 +1,15 @@
 [package]
 name = "btrd"
+description = "The btrfs debugger"
 version = "0.1.0"
+repository = "https://github.com/danobi/btrd"
 authors = ["Daniel Xu <dxu@dxuuu.xyz>"]
 edition = "2018"
+keywords = ["btrfs", "debugger"]
+license = "GPL-2.0"
+
+[badges]
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 anyhow = "1.0"
