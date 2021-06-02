@@ -90,11 +90,7 @@ impl<'a> Eval<'a> {
 
                         Ok(Value::Array(arr))
                     }
-                    (l, r) => bail!(
-                        "Cannot add types '{}' and '{}'",
-                        l.short_display(),
-                        r.short_display()
-                    ),
+                    (l, r) => bail!("Cannot add types '{}' and '{}'", l.type_str(), r.type_str()),
                 }
             }
             BinaryExpression::Minus(lhs, rhs) => {
@@ -409,18 +405,8 @@ impl<'a> Eval<'a> {
             }
             f @ Function::TypeOf => {
                 ensure!(args.len() == 1, "'{}()' requires 1 argument", f);
-
                 let expr = self.eval_expr(&args[0])?;
-                let ty_str = match expr {
-                    Value::Integer(_) => "integer".to_string(),
-                    Value::String(_) => "string".to_string(),
-                    Value::Boolean(_) => "boolean".to_string(),
-                    Value::Array(_) => "array".to_string(),
-                    Value::Function(_) => "function".to_string(),
-                    Value::Struct(s) => format!("struct {}", s.name),
-                };
-
-                Ok(Value::String(ty_str))
+                Ok(Value::String(expr.type_str()))
             }
             f @ Function::KeyOf => {
                 ensure!(args.len() == 1, "'{}()' requires 1 argument", f);

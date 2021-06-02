@@ -28,6 +28,17 @@ impl Value {
         }
     }
 
+    pub fn type_str(&self) -> String {
+        match self {
+            Value::Integer(_) => "integer".to_string(),
+            Value::String(_) => "string".to_string(),
+            Value::Boolean(_) => "boolean".to_string(),
+            Value::Array(_) => "array".to_string(),
+            Value::Function(_) => "function".to_string(),
+            Value::Struct(s) => format!("struct {}", s.name),
+        }
+    }
+
     pub fn as_integer(&self) -> Result<i128> {
         match self {
             Value::Integer(i) => Ok(*i),
