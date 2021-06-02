@@ -90,6 +90,9 @@ impl<'a> Eval<'a> {
 
                         Ok(Value::Array(arr))
                     }
+                    (Value::String(l), Value::String(r)) => {
+                        Ok(Value::String(format!("{}{}", l, r)))
+                    }
                     (l, r) => bail!("Cannot add types '{}' and '{}'", l.type_str(), r.type_str()),
                 }
             }
@@ -1109,5 +1112,34 @@ fn test_logical_lazy_eval() {
             EvalResult::Ok => (),
             _ => assert!(false),
         };
+    }
+}
+
+#[test]
+fn test_string_concat() {
+    let tests = vec![
+        (r#"print "one" + "two";"#, "onetwo\n".to_string()),
+        (
+            r#"print "one" + "two" + "three";"#,
+            "onetwothree\n".to_string(),
+        ),
+        (
+            r#"s = "one"; ss = "two"; print (s + ss);"#,
+            "onetwo\n".to_string(),
+        ),
+    ];
+
+    use crate::lang::parse::parse;
+    for (input, expected) in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
+        match eval.eval(&parse(input).expect("Failed to parse")) {
+            EvalResult::Ok => (),
+            _ => assert!(false, "Failed to eval input"),
+        };
+        assert_eq!(
+            String::from_utf8(output).expect("Output not utf-8"),
+            expected
+        );
     }
 }
