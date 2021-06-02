@@ -444,6 +444,12 @@ impl<'a> Eval<'a> {
                     is_hist: true,
                 }))
             }
+            f @ Function::Str => {
+                ensure!(args.len() == 1, "{}() requires 1 argument", f);
+                let expr = self.eval_expr(&args[0])?;
+
+                Ok(Value::String(format!("{}", expr)))
+            }
         }
     }
 
@@ -770,6 +776,7 @@ impl<'a> Eval<'a> {
                 "hist()",
                 "Returns a histogram (an array that `print()` will format)",
             ),
+            ("str(expr)", "Returns `expr` in string representation"),
         ];
 
         let width = help
@@ -1127,6 +1134,32 @@ fn test_string_concat() {
             r#"s = "one"; ss = "two"; print (s + ss);"#,
             "onetwo\n".to_string(),
         ),
+    ];
+
+    use crate::lang::parse::parse;
+    for (input, expected) in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
+        match eval.eval(&parse(input).expect("Failed to parse")) {
+            EvalResult::Ok => (),
+            _ => assert!(false, "Failed to eval input"),
+        };
+        assert_eq!(
+            String::from_utf8(output).expect("Output not utf-8"),
+            expected
+        );
+    }
+}
+
+#[test]
+fn test_function_str() {
+    let tests = vec![
+        (r#"print str(1);"#, "1\n".to_string()),
+        (r#"print str(1+3);"#, "4\n".to_string()),
+        (r#"print str("str");"#, "str\n".to_string()),
+        (r#"print str(true);"#, "true\n".to_string()),
+        (r#"print str(str);"#, "str()\n".to_string()),
+        (r#"print str(hist());"#, "[\n]\n".to_string()),
     ];
 
     use crate::lang::parse::parse;

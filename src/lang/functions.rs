@@ -10,6 +10,7 @@ pub enum Function {
     TypeOf,
     Len,
     Hist,
+    Str,
 }
 
 impl fmt::Display for Function {
@@ -21,6 +22,7 @@ impl fmt::Display for Function {
             Function::TypeOf => write!(f, "typeof"),
             Function::Len => write!(f, "len"),
             Function::Hist => write!(f, "hist"),
+            Function::Str => write!(f, "str"),
         }
     }
 }
@@ -33,5 +35,6 @@ lazy_static! {
         Function::KeyOf,
         Function::Len,
         Function::Hist,
+        Function::Str,
     ];
 }
