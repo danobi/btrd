@@ -321,7 +321,9 @@ impl Struct {
                             .name
                             .ok_or_else(|| anyhow!("TrailingString can't be anonymous"))?,
                         value: Value::String(
-                            String::from_utf8_lossy(&bytes[offset..end_of_str]).to_string(),
+                            String::from_utf8_lossy(&bytes[offset..end_of_str])
+                                .escape_default()
+                                .to_string(),
                         ),
                     });
 
