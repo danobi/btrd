@@ -15,7 +15,7 @@ maintenance = { status = "actively-developed" }
 anyhow = "1.0"
 lazy_static = "1.4"
 log = "0.4"
-memmap = "0.7"
+memmap2 = "0.3"
 nix = "0.21"
 pom = "3.2"
 rustyline = "8.2"

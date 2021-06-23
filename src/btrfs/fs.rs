@@ -9,7 +9,7 @@ use std::slice::SliceIndex;
 
 use anyhow::{anyhow, bail, ensure, Result};
 use log::info;
-use memmap::MmapMut;
+use memmap2::MmapMut;
 use nix::dir::Dir;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
