@@ -64,7 +64,7 @@ impl<'a> Eval<'a> {
                 Constant::Integer(i) => Value::Integer(*i),
                 Constant::Boolean(b) => Value::Boolean(*b),
             },
-            PrimaryExpression::Str(s) => Value::String(s.clone()),
+            PrimaryExpression::Str(s) => Value::String(s.as_bytes().to_owned()),
             PrimaryExpression::Paren(expr) => self.eval_expr(expr)?,
         };
 
@@ -91,7 +91,9 @@ impl<'a> Eval<'a> {
                         Ok(Value::Array(arr))
                     }
                     (Value::String(l), Value::String(r)) => {
-                        Ok(Value::String(format!("{}{}", l, r)))
+                        let mut concat = l;
+                        concat.extend_from_slice(&r);
+                        Ok(Value::String(concat))
                     }
                     (l, r) => bail!("Cannot add types '{}' and '{}'", l.type_str(), r.type_str()),
                 }
@@ -409,7 +411,7 @@ impl<'a> Eval<'a> {
             f @ Function::TypeOf => {
                 ensure!(args.len() == 1, "'{}()' requires 1 argument", f);
                 let expr = self.eval_expr(&args[0])?;
-                Ok(Value::String(expr.type_str()))
+                Ok(Value::String(expr.type_str().as_bytes().to_owned()))
             }
             f @ Function::KeyOf => {
                 ensure!(args.len() == 1, "'{}()' requires 1 argument", f);
@@ -448,7 +450,13 @@ impl<'a> Eval<'a> {
                 ensure!(args.len() == 1, "{}() requires 1 argument", f);
                 let expr = self.eval_expr(&args[0])?;
 
-                Ok(Value::String(format!("{}", expr)))
+                let val = match expr {
+                    // Just pass through actual strings
+                    s @ Value::String(_) => s,
+                    s => Value::String(format!("{}", s).as_bytes().to_owned()),
+                };
+
+                Ok(val)
             }
         }
     }
@@ -492,7 +500,7 @@ impl<'a> Eval<'a> {
             BuiltinStatement::Quit => InternalEvalResult::Quit,
             BuiltinStatement::Filesystem(fs) => {
                 self.fs = match self.eval_expr(fs) {
-                    Ok(val) => match val.as_string() {
+                    Ok(val) => match val.as_string(true) {
                         Ok(path) => match Fs::new(path) {
                             Ok(fs) => Some(fs),
                             Err(e) => return InternalEvalResult::Err(e.to_string()),
@@ -509,6 +517,11 @@ impl<'a> Eval<'a> {
                     let out = match v {
                         Value::Array(arr) if arr.is_hist => match arr.as_hist() {
                             Ok(o) => o,
+                            Err(e) => return InternalEvalResult::Err(e.to_string()),
+                        },
+                        // Don't escape whitespace if string is directly being printed
+                        s @ Value::String(_) => match s.as_string(false) {
+                            Ok(ss) => ss,
                             Err(e) => return InternalEvalResult::Err(e.to_string()),
                         },
                         _ => format!("{}", v),
@@ -1086,7 +1099,7 @@ fn test_array() {
                 vec: vec![
                     Value::Integer(3),
                     Value::Integer(5),
-                    Value::String("asdf".to_string()),
+                    Value::String("asdf".as_bytes().to_owned()),
                 ],
                 is_hist: false,
             }),
@@ -1166,6 +1179,52 @@ fn test_function_str() {
     for (input, expected) in tests {
         let mut output = Vec::new();
         let mut eval = Eval::new(&mut output, false);
+        match eval.eval(&parse(input).expect("Failed to parse")) {
+            EvalResult::Ok => (),
+            _ => assert!(false, "Failed to eval input"),
+        };
+        assert_eq!(
+            String::from_utf8(output).expect("Output not utf-8"),
+            expected
+        );
+    }
+}
+
+#[test]
+fn test_lossless_string() {
+    let tests = vec![
+        (r#"print "string\n";"#, "string\n\n".to_string()),
+        (r#"print "string\r\t";"#, "string\r\t\n".to_string()),
+        // Calling str() on a string should simply pass through the string. Ensure that whitespace is
+        // not unnecessarily escaped.
+        (r#"print str("string\r\t");"#, "string\r\t\n".to_string()),
+        (
+            r#"print binstring;"#,
+            r#"\x00\x01\x02\x80"#.to_string() + "\n",
+        ),
+        // Ensure binary strings are passed through as well.
+        (
+            r#"print str(binstring);"#,
+            r#"\x00\x01\x02\x80"#.to_string() + "\n",
+        ),
+        // Mix binary and whitespace escape sequences
+        (
+            r#"print str(binstring) + "\n";"#,
+            r#"\x00\x01\x02\x80"#.to_string() + "\n\n",
+        ),
+    ];
+
+    use crate::lang::parse::parse;
+    for (input, expected) in tests {
+        let mut output = Vec::new();
+        let mut eval = Eval::new(&mut output, false);
+
+        // Insert a binary string
+        eval.variables.insert(
+            Identifier("binstring".to_string()),
+            Value::String(vec![0, 1, 2, 128]),
+        );
+
         match eval.eval(&parse(input).expect("Failed to parse")) {
             EvalResult::Ok => (),
             _ => assert!(false, "Failed to eval input"),
