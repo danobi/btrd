@@ -450,13 +450,6 @@ impl<'a> Eval<'a> {
 
                 Ok(Value::String(format!("{}", expr)))
             }
-            f @ Function::Esc => {
-                ensure!(args.len() == 1, "{}() requires 1 argument", f);
-                let expr = self.eval_expr(&args[0])?;
-                let s = expr.as_string()?;
-
-                Ok(Value::String(format!("{}", s.escape_default())))
-            }
         }
     }
 
@@ -784,10 +777,6 @@ impl<'a> Eval<'a> {
                 "Returns a histogram (an array that `print()` will format)",
             ),
             ("str(expr)", "Returns `expr` in string representation"),
-            (
-                "esc(string)",
-                "Returns a string with non-ascii characters in `string` escaped",
-            ),
         ];
 
         let width = help
@@ -1185,44 +1174,5 @@ fn test_function_str() {
             String::from_utf8(output).expect("Output not utf-8"),
             expected
         );
-    }
-}
-
-#[test]
-fn test_function_esc() {
-    {
-        let tests = vec![
-            (r#"print esc("1\t2");"#, "1\\t2\n".to_string()),
-            (r#"print esc("1\\t2");"#, "1\\\\t2\n".to_string()),
-            (r#"print esc("1 2");"#, "1 2\n".to_string()),
-            (r#"print esc("1 2\n");"#, "1 2\\n\n".to_string()),
-        ];
-
-        use crate::lang::parse::parse;
-        for (input, expected) in tests {
-            let mut output = Vec::new();
-            let mut eval = Eval::new(&mut output, false);
-            match eval.eval(&parse(input).expect("Failed to parse")) {
-                EvalResult::Ok => (),
-                _ => assert!(false, "Failed to eval input"),
-            };
-            assert_eq!(
-                String::from_utf8(output).expect("Output not utf-8"),
-                expected
-            );
-        }
-    }
-    {
-        let tests = vec![(r#"esc(1);"#), (r#"esc(hist());"#), (r#"esc();"#)];
-
-        use crate::lang::parse::parse;
-        for input in tests {
-            let mut output = Vec::new();
-            let mut eval = Eval::new(&mut output, false);
-            match eval.eval(&parse(input).expect("Failed to parse")) {
-                EvalResult::Err(_) => (),
-                _ => assert!(false, "Eval succeeded when should have failed"),
-            };
-        }
     }
 }
