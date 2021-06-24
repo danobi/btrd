@@ -1,3 +1,4 @@
+use std::ascii::escape_default;
 use std::convert::TryInto;
 use std::fmt;
 
@@ -12,7 +13,9 @@ pub enum Value {
     ///
     /// Any conversion errors (eg. during demotion, to unsigned) will trigger runtime errors
     Integer(i128),
-    String(String),
+    /// Strings are internally stored as an array of u8 to support lossless strings (in the event
+    /// that the "string" isn't utf-8)
+    String(Vec<u8>),
     Boolean(bool),
     Array(Array),
     Function(Function),
@@ -53,9 +56,22 @@ impl Value {
         }
     }
 
-    pub fn as_string(&self) -> Result<String> {
+    pub fn as_string(&self, esc_whitespace: bool) -> Result<String> {
         match self {
-            Value::String(s) => Ok(s.clone()),
+            Value::String(s) => {
+                // Assume most of the time no escaping is required, so size is same
+                let mut escaped_bytes = Vec::with_capacity(s.len());
+
+                for b in s {
+                    if !esc_whitespace && b.is_ascii_whitespace() {
+                        escaped_bytes.push(*b);
+                    } else {
+                        escaped_bytes.extend(escape_default(*b));
+                    }
+                }
+
+                Ok(String::from_utf8(escaped_bytes)?)
+            }
             v => bail!("Expected string, got '{}'", v.short_display()),
         }
     }
@@ -86,7 +102,9 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Integer(i) => write!(f, "{}", i),
-            Value::String(s) => write!(f, "{}", s),
+            // Escape whitespace in string by default. Leave whitespace unescaped by explicitly
+            // asking for it in `as_string()`.
+            Value::String(_) => write!(f, "{}", self.as_string(true).unwrap()),
             Value::Boolean(b) => {
                 write!(f, "{}", if *b { "true" } else { "false" })
             }
@@ -320,11 +338,7 @@ impl Struct {
                         name: field
                             .name
                             .ok_or_else(|| anyhow!("TrailingString can't be anonymous"))?,
-                        value: Value::String(
-                            String::from_utf8_lossy(&bytes[offset..end_of_str])
-                                .escape_default()
-                                .to_string(),
-                        ),
+                        value: Value::String(bytes[offset..end_of_str].to_owned()),
                     });
 
                     offset += string_len;
@@ -924,13 +938,19 @@ fn test_struct_deserialize() {
 
         assert_eq!(interpreted.fields[2].name, "name1");
         assert_eq!(
-            interpreted.fields[2].value.as_string().expect("not string"),
+            interpreted.fields[2]
+                .value
+                .as_string(true)
+                .expect("not string"),
             "hello"
         );
 
         assert_eq!(interpreted.fields[3].name, "name2");
         assert_eq!(
-            interpreted.fields[3].value.as_string().expect("not string"),
+            interpreted.fields[3]
+                .value
+                .as_string(true)
+                .expect("not string"),
             "world12"
         );
     }
