@@ -11,7 +11,6 @@ pub enum Function {
     Len,
     Hist,
     Str,
-    Esc,
 }
 
 impl fmt::Display for Function {
@@ -24,7 +23,6 @@ impl fmt::Display for Function {
             Function::Len => write!(f, "len"),
             Function::Hist => write!(f, "hist"),
             Function::Str => write!(f, "str"),
-            Function::Esc => write!(f, "esc"),
         }
     }
 }
@@ -38,6 +36,5 @@ lazy_static! {
         Function::Len,
         Function::Hist,
         Function::Str,
-        Function::Esc,
     ];
 }
