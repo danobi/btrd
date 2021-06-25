@@ -980,7 +980,7 @@ lazy_static! {
         },
         Struct {
             name: "btrfs_dir_item",
-            key_match: |_, ty, _| ty == BTRFS_DIR_ITEM_KEY || ty == BTRFS_XATTR_ITEM_KEY,
+            key_match: |_, ty, _| ty == BTRFS_DIR_ITEM_KEY || ty == BTRFS_DIR_INDEX_KEY || ty == BTRFS_XATTR_ITEM_KEY,
             fields: vec![
                 Field {
                     name: Some("location"),
