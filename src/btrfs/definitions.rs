@@ -643,12 +643,8 @@ lazy_static! {
         key_match: |_, _, _| false,
         fields: vec![
             Field {
-                name: Some("type"),
-                ty: Type::U8,
-            },
-            Field {
-                name: Some("offset"),
-                ty: Type::U64,
+                name: Some("count"),
+                ty: Type::U32,
             },
         ],
     };
@@ -880,6 +876,7 @@ lazy_static! {
                                 ty: Type::Struct(BTRFS_SHARED_DATA_REF.clone()),
                             });
                             offset += BTRFS_SHARED_DATA_REF.size();
+                            offset += 8;
                         } else if ty == BTRFS_SHARED_BLOCK_REF_KEY || ty == BTRFS_TREE_BLOCK_REF_KEY {
                             inline_ref.fields.push(Field {
                                 name: Some("offset"),
