@@ -872,11 +872,15 @@ lazy_static! {
                             offset += BTRFS_EXTENT_DATA_REF.size();
                         } else if ty == BTRFS_SHARED_DATA_REF_KEY {
                             inline_ref.fields.push(Field {
+                                name: Some("offset"),
+                                ty: Type::U64,
+                            });
+                            offset += 8;
+                            inline_ref.fields.push(Field {
                                 name: Some("shared_data_ref"),
                                 ty: Type::Struct(BTRFS_SHARED_DATA_REF.clone()),
                             });
                             offset += BTRFS_SHARED_DATA_REF.size();
-                            offset += 8;
                         } else if ty == BTRFS_SHARED_BLOCK_REF_KEY || ty == BTRFS_TREE_BLOCK_REF_KEY {
                             inline_ref.fields.push(Field {
                                 name: Some("offset"),
