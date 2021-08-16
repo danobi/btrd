@@ -1171,48 +1171,68 @@ lazy_static! {
         Struct {
             name: "btrfs_file_extent_item",
             key_match: |_, ty, _| ty == BTRFS_EXTENT_DATA_KEY,
-            fields: vec![
-                Field {
-                    name: Some("generation"),
-                    ty: Type::U64,
-                },
-                Field {
-                    name: Some("ram_bytes"),
-                    ty: Type::U64,
-                },
-                Field {
-                    name: Some("compression"),
-                    ty: Type::U8,
-                },
-                Field {
-                    name: Some("encryption"),
-                    ty: Type::U8,
-                },
-                Field {
-                    name: Some("other_encoding"),
-                    ty: Type::U16,
-                },
-                Field {
-                    name: Some("type"),
-                    ty: Type::U8,
-                },
-                Field {
-                    name: Some("disk_bytenr"),
-                    ty: Type::U64,
-                },
-                Field {
-                    name: Some("disk_num_bytes"),
-                    ty: Type::U64,
-                },
-                Field {
-                    name: Some("offset"),
-                    ty: Type::U64,
-                },
-                Field {
-                    name: Some("num_bytes"),
-                    ty: Type::U64,
-                },
-            ],
+            fields: vec![Field {
+                name: None,
+                ty: Type::DynamicStruct(|bytes| -> Result<Vec<Field>> {
+                    let mut ret = Vec::new();
+
+                    // Static fields
+                    let static_header_len = 21;
+                    ret.push(Field {
+                        name: Some("generation"),
+                        ty: Type::U64,
+                    });
+                    ret.push(Field {
+                        name: Some("ram_bytes"),
+                        ty: Type::U64,
+                    });
+                    ret.push(Field {
+                        name: Some("compression"),
+                        ty: Type::U8,
+                    });
+                    ret.push(Field {
+                        name: Some("encryption"),
+                        ty: Type::U8,
+                    });
+                    ret.push(Field {
+                        name: Some("other_encoding"),
+                        ty: Type::U16,
+                    });
+                    ret.push(Field {
+                        name: Some("type"),
+                        ty: Type::U8,
+                    });
+
+                    ensure!(
+                        bytes.len() >= static_header_len,
+                        "Cannot interpret 'struct btrfs_file_extent_item', not enough bytes provided ({} < {})",
+                        bytes.len(),
+                        static_header_len
+                    );
+
+                    let ty: i128 = u8::from_le(bytes[static_header_len - 1]).into();
+                    if ty == BTRFS_FILE_EXTENT_REG || ty == BTRFS_FILE_EXTENT_PREALLOC {
+                        ret.push(Field {
+                            name: Some("disk_bytenr"),
+                            ty: Type::U64,
+                        });
+                        ret.push(Field {
+                            name: Some("disk_num_bytes"),
+                            ty: Type::U64,
+                        });
+                        ret.push(Field {
+                            name: Some("offset"),
+                            ty: Type::U64,
+                        });
+                        ret.push(Field {
+                            name: Some("num_bytes"),
+                            ty: Type::U64,
+                        });
+                    }
+
+                    Ok(ret)
+                }),
+            }],
         },
         Struct {
             name: "btrfs_csum_item",
