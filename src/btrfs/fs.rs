@@ -33,7 +33,7 @@ ioctl_readwrite!(
 
 #[repr(C)]
 #[derive(Default, Debug)]
-struct BtrfsIoctlSearchKey {
+pub struct BtrfsIoctlSearchKey {
     tree_id: u64,
     min_objectid: u64,
     max_objectid: u64,
@@ -86,7 +86,7 @@ pub struct BtrfsIoctlSearchHeader {
     pub len: u32,
 }
 
-enum FsInner {
+pub enum FsInner {
     Mounted(Dir),
     Unmounted(MmapMut),
 }
@@ -96,7 +96,7 @@ enum FsInner {
 /// Holds a refcount on the FS while alive and decrements when struct is dropped (to prevent FS
 /// from being unmounted while we're debugging)
 pub struct Fs {
-    inner: FsInner,
+    pub inner: FsInner,
 }
 
 impl Fs {
