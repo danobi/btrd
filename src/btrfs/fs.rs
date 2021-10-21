@@ -33,7 +33,7 @@ ioctl_readwrite!(
 
 #[repr(C)]
 #[derive(Default, Debug)]
-struct BtrfsIoctlSearchKey {
+pub struct BtrfsIoctlSearchKey {
     tree_id: u64,
     min_objectid: u64,
     max_objectid: u64,
