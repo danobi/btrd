@@ -86,7 +86,7 @@ pub struct BtrfsIoctlSearchHeader {
     pub len: u32,
 }
 
-pub enum FsInner {
+enum FsInner {
     Mounted(Dir),
     Unmounted(MmapMut),
 }
@@ -96,7 +96,7 @@ pub enum FsInner {
 /// Holds a refcount on the FS while alive and decrements when struct is dropped (to prevent FS
 /// from being unmounted while we're debugging)
 pub struct Fs {
-    pub inner: FsInner,
+    inner: FsInner,
 }
 
 impl Fs {
