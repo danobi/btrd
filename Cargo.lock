@@ -42,7 +42,7 @@ checksum = "2da1976d75adbe5fbc88130ecd119529cf1cc6a93ae1546d8696ee66f0d21af1"
 
 [[package]]
 name = "btrd"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "lazy_static",
