@@ -36,9 +36,9 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "bitflags"
-version = "1.3.1"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2da1976d75adbe5fbc88130ecd119529cf1cc6a93ae1546d8696ee66f0d21af1"
+checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
 name = "btrd"
@@ -48,7 +48,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memmap2",
- "nix 0.21.0",
+ "nix 0.22.2",
  "pom",
  "rustyline",
  "rustyline-derive",
@@ -251,9 +251,9 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.21.0"
+version = "0.22.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c3728fec49d363a50a8828a190b379a446cc5cf085c06259bbbeb34447e4ec7"
+checksum = "d3bb9a13fa32bc5aeb64150cd3f32d6cf4c748f8f8a417cce5d2eb976a8370ba"
 dependencies = [
  "bitflags",
  "cc",
