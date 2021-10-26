@@ -15,7 +15,6 @@ use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::ioctl_readwrite;
 use nix::sys::{stat::Mode, statfs::fstatfs};
-use nix::Error as NixError;
 
 const BTRFS_SUPERBLOCK_MAGIC: [u8; 8] = *b"_BHRfS_M";
 const BTRFS_SUPERBLOCK_MAGIC_LOCS: [usize; 3] =
@@ -202,7 +201,7 @@ impl Fs {
 
             match unsafe { btrfs_tree_search_v2(fs.as_raw_fd(), &mut *args) } {
                 Ok(_) => (),
-                Err(NixError::Sys(Errno::EOVERFLOW)) => (),
+                Err(Errno::EOVERFLOW) => (),
                 Err(e) => bail!(e),
             };
 
