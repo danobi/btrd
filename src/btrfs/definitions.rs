@@ -810,6 +810,11 @@ lazy_static! {
         BTRFS_EXTENT_DATA_REF.clone(),
         BTRFS_SHARED_DATA_REF.clone(),
         Struct {
+            name: "btrfs_orphan_item",
+            key_match: |o, ty, _| o == BTRFS_ORPHAN_OBJECTID.into() && ty == BTRFS_ORPHAN_ITEM_KEY,
+            fields: vec![],
+        },
+        Struct {
             name: "btrfs_extent_item",
             key_match: |_, ty, _| ty == BTRFS_EXTENT_ITEM_KEY || ty == BTRFS_METADATA_ITEM_KEY,
             fields: vec![Field {
