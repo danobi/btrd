@@ -4,8 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
 use log::{error, info};
-use rustyline::error::ReadlineError;
-use rustyline::{config::Config as EditorConfig, Editor, Helper};
+use rustyline::{config::Config as EditorConfig, error::ReadlineError, history::FileHistory, Editor, Helper};
 use simplelog::{Color, ColorChoice, ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
 use structopt::StructOpt;
 
@@ -47,20 +46,20 @@ fn init_logging(debug: bool) -> Result<()> {
     }
 }
 
-fn init_editor() -> Editor<ReplHelper> {
+fn init_editor() -> Result<Editor<ReplHelper, FileHistory>> {
     let config = EditorConfig::builder().auto_add_history(true).build();
-    let mut editor = Editor::with_config(config);
+    let mut editor = Editor::with_config(config)?;
     let validator = ReplHelper::new();
     editor.set_helper(Some(validator));
 
-    editor
+    Ok(editor)
 }
 
-fn init_history<H: Helper>(editor: &mut Editor<H>) {
+fn init_history<H: Helper>(editor: &mut Editor<H, FileHistory>) {
     let _ = editor.load_history(HISTORY_FILE);
 }
 
-fn save_history<H: Helper>(editor: &mut Editor<H>) -> Result<()> {
+fn save_history<H: Helper>(editor: &mut Editor<H, FileHistory>) -> Result<()> {
     match editor.save_history(HISTORY_FILE) {
         Ok(_) => Ok(()),
         Err(e) => bail!("Failed to save history: {}", e),
@@ -77,7 +76,7 @@ fn welcome() {
 }
 
 fn repl(sink: &mut dyn Write) -> Result<()> {
-    let mut editor = init_editor();
+    let mut editor = init_editor()?;
     init_history(&mut editor);
     welcome();
 
