@@ -6,7 +6,7 @@ use anyhow::{bail, Result};
 use log::{error, info};
 use rustyline::{config::Config as EditorConfig, error::ReadlineError, history::FileHistory, Editor, Helper};
 use simplelog::{Color, ColorChoice, ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
-use structopt::StructOpt;
+use clap::Parser;
 
 mod btrfs;
 mod input;
@@ -19,10 +19,10 @@ use lang::runtime::Runtime;
 const HISTORY_FILE: &str = ".btrd_history";
 const PROMPT: &str = "(btrd) ";
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Opt {
     /// Show debug output
-    #[structopt(short, long)]
+    #[clap(short, long)]
     debug: bool,
     /// Run a script (instead of running the REPL)
     script: Option<PathBuf>,
@@ -137,7 +137,7 @@ fn script(sink: &mut dyn Write, script: &Path) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let opts = Opt::from_args();
+    let opts = Opt::parse();
     init_logging(opts.debug)?;
 
     let mut stdout = std::io::stdout();

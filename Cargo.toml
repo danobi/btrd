@@ -13,6 +13,7 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 anyhow = "1.0"
+clap = { version = "4", features = ["derive"] }
 lazy_static = "1.4"
 log = "0.4"
 memmap2 = "0.9"
@@ -20,4 +21,3 @@ nix = "0.26"
 pom = "3.2"
 rustyline = { version = "12", features = ["derive"] }
 simplelog = "0.12"
-structopt = "0.3"
