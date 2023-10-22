@@ -54,18 +54,12 @@ dependencies = [
  "lazy_static",
  "log",
  "memmap2",
- "nix 0.23.1",
+ "nix",
  "pom",
  "rustyline",
  "simplelog",
  "structopt",
 ]
-
-[[package]]
-name = "cc"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e70cc2f62c6ce1868963827bd677764c62d07c3d9a3e1fb1177ee1a9ab199eb2"
 
 [[package]]
 name = "cfg-if"
@@ -220,9 +214,9 @@ dependencies = [
 
 [[package]]
 name = "memoffset"
-version = "0.6.4"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59accc507f1338036a0477ef61afdae33cde60840f4dfe481319ce3ad116ddf9"
+checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
 dependencies = [
  "autocfg",
 ]
@@ -238,19 +232,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
-dependencies = [
- "bitflags 1.2.1",
- "cc",
- "cfg-if",
- "libc",
- "memoffset",
-]
-
-[[package]]
-name = "nix"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
@@ -258,6 +239,8 @@ dependencies = [
  "bitflags 1.2.1",
  "cfg-if",
  "libc",
+ "memoffset",
+ "pin-utils",
 ]
 
 [[package]]
@@ -278,6 +261,12 @@ checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "pin-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "pom"
@@ -364,7 +353,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.26.4",
+ "nix",
  "radix_trie",
  "rustyline-derive",
  "scopeguard",
