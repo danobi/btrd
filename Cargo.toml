@@ -19,5 +19,5 @@ memmap2 = "0.9"
 nix = "0.26"
 pom = "3.2"
 rustyline = { version = "12", features = ["derive"] }
-simplelog = "0.11"
+simplelog = "0.12"
 structopt = "0.3"
