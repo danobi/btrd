@@ -1,6 +1,5 @@
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
-use rustyline::Result;
-use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
+use rustyline::{Completer, Helper, Highlighter, Hinter, Result};
 
 /// Helper that extends editor
 ///

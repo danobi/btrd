@@ -18,7 +18,6 @@ log = "0.4"
 memmap2 = "0.5"
 nix = "0.23"
 pom = "3.2"
-rustyline = "8.2"
-rustyline-derive = "0.4"
+rustyline = { version = "12", features = ["derive"] }
 simplelog = "0.11"
 structopt = "0.3"
