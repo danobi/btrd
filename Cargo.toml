@@ -6,7 +6,7 @@ repository = "https://github.com/danobi/btrd"
 authors = ["Daniel Xu <dxu@dxuuu.xyz>"]
 edition = "2018"
 keywords = ["btrfs", "debugger"]
-license = "GPL-2.0"
+license = "GPL-2.0-only"
 
 [badges]
 maintenance = { status = "actively-developed" }
