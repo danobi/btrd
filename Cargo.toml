@@ -17,7 +17,7 @@ clap = { version = "4", features = ["derive"] }
 lazy_static = "1.4"
 log = "0.4"
 memmap2 = "0.9"
-nix = "0.26"
+nix = { version = "0.30", features = ["dir", "fs", "ioctl"] }
 pom = "3.2"
-rustyline = { version = "13", features = ["derive"] }
+rustyline = { version = "17", features = ["derive"] }
 simplelog = "0.12"
